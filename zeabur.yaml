@@ -138,8 +138,8 @@ spec:
         - redis
       spec:
         source:
-          source: GITHUB
-          repo: 1358217134
+          source: ARBITRARY_GIT
+          gitURL: https://github.com/zombie-egg/AI-ZOO.git
           branch: main
           rootDirectory: .
         ports:
