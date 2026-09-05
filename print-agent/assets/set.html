@@ -1,0 +1,694 @@
+<!--
+ * @Date: 2023-09-05 13:56:58
+ * @LastEditors: admin@54xavier.cn
+ * @LastEditTime: 2024-12-14 21:50:41
+ * @FilePath: /electron-hiprint/assets/set.html
+-->
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>设置</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="./element-ui/index.css" />
+    <script src="./js/vue.min.js"></script>
+    <script src="./element-ui/index.js"></script>
+    <script src="./js/dayjs.min.js"></script>
+    <script src="./js/lodash.min.js"></script>
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        user-select: none;
+      }
+
+      #app {
+        padding: 12px 22px;
+      }
+
+      .el-form-item {
+        width: 100%;
+        margin-bottom: 8px;
+      }
+
+      .el-form--label-top .el-form-item__label {
+        padding: 0;
+      }
+
+      .el-input-number,
+      .el-select,
+      .el-button {
+        width: 100%;
+      }
+
+      /* 隐藏滚动条，但仍然可以滚动 */
+      .hide-scrollbar {
+        -ms-overflow-style: none; /* IE 和 Edge */
+        scrollbar-width: none; /* Firefox */
+      }
+
+      /* 在内容高度足够时显示滚动条，否则隐藏 */
+      .hide-scrollbar::-webkit-scrollbar {
+        display: none; /* Chrome, Safari 和 Opera */
+      }
+    </style>
+  </head>
+
+  <body class="hide-scrollbar">
+    <div id="app">
+      <el-tabs v-model="setTab" @tab-click="handleTabChange">
+        <template v-for="tab in tabs">
+          <el-tab-pane :key="tab.name" :label="tab.label" :name="tab.name" />
+        </template>
+      </el-tabs>
+      <el-form
+        ref="formRef"
+        :model="formData"
+        :rules="rules"
+        v-bind="formOptions"
+        items=""
+      >
+        <el-row :gutter="12">
+          <template v-for="item in formOptions.items">
+            <el-col :span="item.span || formOptions.span">
+              <el-form-item
+                v-if="item.display !== false"
+                :key="item.prop"
+                :label="item.label"
+                :prop="item.prop"
+                :style="item.style"
+              >
+                <template #label>
+                  <el-tooltip v-if="item.tips" :content="item.tips" placement="top-start">
+                    <span>{{item.label}} <i class="el-icon-question"></i></span>
+                  </el-tooltip>
+                  <span v-else>{{item.label}}</span>
+                </template>
+                <component
+                  v-if="item.optionIs"
+                  :is="item.is"
+                  v-model="formData[item.prop]"
+                  v-bind="item.attrs"
+                  v-on="item.event"
+                >
+                  <template v-for="option in item.options">
+                    <template v-if="item.optionRender">
+                      <component
+                        :is="item.optionIs"
+                        v-bind="option"
+                        :key="option.value"
+                      >
+                        <render-component
+                          :render="item.optionRender"
+                          :data="option"
+                        />
+                      </component>
+                    </template>
+                    <component v-else :is="item.optionIs" v-bind="option">
+                      {{ option.content || option.value }}
+                    </component>
+                  </template>
+                </component>
+                <component
+                  v-else
+                  :is="item.is"
+                  v-model="formData[item.prop]"
+                  v-bind="item.attrs"
+                  v-on="item.event"
+                >
+                  {{ item.content }}
+                </component>
+              </el-form-item>
+            </el-col>
+          </template>
+          <el-col :span="24">
+            <el-form-item>
+              <el-row :gutter="12">
+                <el-col span="12">
+                  <el-button type="primary" size="small" @click="submit">
+                    应用
+                  </el-button>
+                </el-col>
+                <el-col span="12">
+                  <el-button size="small" @click="close">
+                    关闭
+                  </el-button>
+                </el-col>
+              </el-row>
+            </el-form-item>
+          </el-col>
+        </el-row>
+      </el-form>
+    </div>
+    <script type="text/javascript">
+      const { ipcRenderer } = require("electron");
+      const Store = require("electron-store");
+      const store = new Store();
+
+      let ipc = ipcRenderer;
+
+      new Vue({
+        el: "#app",
+        data: () => {
+          return {
+            setTab: "basicSet",
+            tabs: [
+              {
+                label: "基础设置",
+                name: "basicSet",
+                height: 600,
+              },
+              {
+                label: "中转设置",
+                name: "transitSet",
+              },
+              {
+                label: "高级设置",
+                name: "advancedSet",
+              },
+            ],
+            // 设置值
+            formData: {
+              port: 17521,
+              token: "",
+              pluginVersion: "",
+              openAtLogin: false,
+              openAsHidden: false,
+              connectTransit: false,
+              nickName: "",
+              transitUrl: "",
+              transitToken: "",
+              allowNotify: false,
+              closeType: "tray",
+              logPath: "",
+              pdfPath: "",
+              defaultPrinter: "",
+            },
+            // 预制的版本，解决部分内网无法获取新版本的问题
+            versions: [
+              {
+                value: "0.0.60",
+                info: "2025/03/24 17:25:24",
+              },
+              {
+                value: "0.0.56",
+                info: "2023/11/19 22:43:45",
+              },
+              {
+                value: "0.0.54-fix",
+                info: "2023/07/10 10:34:19",
+              },
+              {
+                value: "0.0.52",
+                info: "2023/05/08 17:57:53",
+              },
+            ],
+            downloadedVersions: [], // 存储已下载版本
+            printerList: [], // 打印机列表
+          };
+        },
+        computed: {
+          formOptions() {
+            return {
+              size: "small",
+              labelPosition: "top",
+              inline: true,
+              span: 24,
+              spellcheck: false,
+              items: [
+                {
+                  label: "端口设置",
+                  prop: "port",
+                  is: "el-input-number",
+                  attrs: {
+                    min: 10000,
+                    max: 65535,
+                    controls: false,
+                    placeholder: "请输入10000-65535之间的端口号(17521)",
+                  },
+                  display: this.setTab === "basicSet",
+                  rules: [
+                    {
+                      required: true,
+                      message: "端口号不能为空",
+                      trigger: "blur",
+                    },
+                  ],
+                },
+                {
+                  label: "TOKEN 设置",
+                  prop: "token",
+                  is: "el-input",
+                  attrs: {
+                    minlength: 5,
+                    maxlength: 32,
+                    placeholder: "请输入5-32个字符作为TOKEN",
+                  },
+                  display: this.setTab === "basicSet",
+                  rules: [
+                    {
+                      min: 5,
+                      max: 32,
+                      message: "只能输入5-32个字符作为TOKEN",
+                      trigger: "blur",
+                    },
+                  ],
+                },
+                {
+                  label: "别名",
+                  prop: "nickName",
+                  is: "el-input",
+                  attrs: {
+                    placeholder: "请输入便于识别的别名",
+                  },
+                  tips: "方便识别的友好名称",
+                  display: this.setTab === "basicSet",
+                },
+                {
+                  label: "插件版本设置",
+                  prop: "pluginVersion",
+                  is: "el-select",
+                  optionIs: "el-option",
+                  tips: "Render api 使用的渲染版本",
+                  attrs: {
+                    filterable: true,
+                    defaultFirstOption: true,
+                  },
+                  options: this.versions,
+                  optionRender: (h, option) => {
+                    const isDownloaded = this.downloadedVersions.includes(
+                      option.value,
+                    );
+                    return h(
+                      "div",
+                      {
+                        style: {
+                          display: "flex",
+                          justifyContent: "space-between",
+                        },
+                      },
+                      [
+                        h(
+                          "span",
+                          {
+                            style: {
+                              fontFamily: "monospace",
+                            },
+                          },
+                          option.value,
+                        ),
+                        h(
+                          "span",
+                          {
+                            style: {
+                              fontFamily: "monospace",
+                            },
+                          },
+                          [
+                            option.info,
+                            h("i", {
+                              class: "el-icon-success",
+                              style: {
+                                color: isDownloaded ? "#67C23A" : "transparent",
+                                marginLeft: "4px",
+                              },
+                            }),
+                          ],
+                        ),
+                      ],
+                    );
+                  },
+                  event: {
+                    change: (val) => {
+                      const isDownloaded = this.downloadedVersions.includes(
+                        val,
+                      );
+                      if (!isDownloaded) {
+                        ipc.send("downloadPlugin", val);
+                      }
+                    },
+                  },
+                  display: this.setTab === "basicSet",
+                },
+                {
+                  label: "日志路径",
+                  prop: "logPath",
+                  is: "el-input",
+                  tips: "程序运行时产生的日志路径",
+                  attrs: {
+                    readonly: true,
+                  },
+                  event: {
+                    click: () => {
+                      this.openDirectory("logPath");
+                    },
+                  },
+                  span: 18,
+                  display: this.setTab === "basicSet",
+                },
+                {
+                  label: "　",　// 全角空格占位，防止样式坍塌　
+                  is: "el-button",
+                  event: {
+                    click: () => {
+                      this.chooseDirectory("logPath");
+                    },
+                  },
+                  content: "选择",
+                  span: 6,
+                  display: this.setTab === "basicSet",
+                },
+                {
+                  label: "PDF 缓存路径",
+                  prop: "pdfPath",
+                  is: "el-input",
+                  tips: "系统运行过程中的临时 PDF 存储路径",
+                  attrs: {
+                    readonly: true,
+                  },
+                  event: {
+                    click: () => {
+                      this.openDirectory("pdfPath");
+                    },
+                  },
+                  style: {
+                    marginBottom: "60px",
+                  },
+                  span: 18,
+                  display: this.setTab === "basicSet",
+                },
+                {
+                  label: "　",　// 全角空格占位，防止样式坍塌
+                  is: "el-button",
+                  event: {
+                    click: () => {
+                      this.chooseDirectory("pdfPath");
+                    },
+                  },
+                  content: "选择",
+                  span: 6,
+                  style: {
+                    marginBottom: "60px",
+                  },
+                  display: this.setTab === "basicSet",
+                },
+                {
+                  label: "连接中转代理服务(node-hiprint-transit)",
+                  prop: "connectTransit",
+                  is: "el-switch",
+                  tips: "通过中转代理可以实现云打印，摆脱局域网限制",
+                  event: {
+                    change: () => this.handleTabChange(),
+                  },
+                  display: this.setTab === "transitSet",
+                },
+                {
+                  label: "服务器地址",
+                  prop: "transitUrl",
+                  is: "el-input",
+                  attrs: {
+                    placeholder: "请输入中转服务地址",
+                  },
+                  display:
+                    this.setTab === "transitSet" &&
+                    this.formData.connectTransit,
+                  rules: [
+                    {
+                      required: true,
+                      message: "中转服务器地址不能为空",
+                      trigger: "blur",
+                    },
+                  ],
+                },
+                {
+                  label: "服务器 TOKEN",
+                  prop: "transitToken",
+                  is: "el-input",
+                  attrs: {
+                    minlength: 5,
+                    maxlength: 32,
+                    placeholder: "请输入中转服务 TOKEN",
+                  },
+                  span: 18,
+                  display:
+                    this.setTab === "transitSet" &&
+                    this.formData.connectTransit,
+                  rules: [
+                    {
+                      required: true,
+                      message: "中转服务 Token 不能为空",
+                      trigger: "blur",
+                    },
+                  ],
+                },
+                {
+                  label: "　",　// 全角空格占位，防止样式坍塌
+                  prop: "connectTest",
+                  is: "el-button",
+                  event: {
+                    click: this.handleTest,
+                  },
+                  content: "测试连接",
+                  span: 6,
+                  display:
+                    this.setTab === "transitSet" &&
+                    this.formData.connectTransit,
+                },
+                {
+                  label: "开机启动",
+                  prop: "openAtLogin",
+                  is: "el-switch",
+                  tips: "请注意杀毒软件拦截",
+                  span: 12,
+                  display: this.setTab === "advancedSet",
+                },
+                {
+                  label: "静默启动",
+                  prop: "openAsHidden",
+                  is: "el-switch",
+                  tips: "启动后不显示主窗口，收起到托盘",
+                  span: 12,
+                  display: this.setTab === "advancedSet",
+                },
+                {
+                  label: "默认打印机",
+                  prop: "defaultPrinter",
+                  is: "el-select",
+                  tips: "打印任务未指定打印机时将优先使用该打印机",
+                  optionIs: "el-option",
+                  attrs: {
+                    clearable: true,
+                  },
+                  options: this.printerList,
+                  display: this.setTab === "advancedSet",
+                },
+                {
+                  label: "禁用GPU",
+                  prop: "disabledGpu",
+                  is: "el-switch",
+                  tips: "可能优化字体模糊问题",
+                  span: 12,
+                  display: this.setTab === "advancedSet",
+                },
+                {
+                  label: "允许通知",
+                  prop: "allowNotify",
+                  is: "el-switch",
+                  span: 12,
+                  display: this.setTab === "advancedSet",
+                },
+                {
+                  label: "关闭主窗口动作",
+                  prop: "closeType",
+                  is: "el-radio-group",
+                  optionIs: "el-radio",
+                  options: [
+                    {
+                      label: "tray",
+                      border: true,
+                      content: "最小化到托盘",
+                      style: {
+                        marginRight: "6px",
+                      },
+                    },
+                    {
+                      label: "quit",
+                      border: true,
+                      content: "退出程序",
+                      style: {
+                        marginLeft: "6px",
+                      },
+                    },
+                  ],
+                  display: this.setTab === "advancedSet",
+                },
+              ],
+            };
+          },
+          rules() {
+            const obj = {};
+            this.formOptions.items.forEach(({ prop, rules }) => {
+              if (Array.isArray(rules)) {
+                obj[prop] = rules;
+              }
+            });
+            return obj;
+          },
+        },
+        created() {
+          this.onEvents();
+          // 获取配置
+          this.formData = store.store;
+          this.getVersions();
+          this.getPrintersList();
+        },
+        mounted() {
+          this.handleTabChange();
+        },
+        beforeDestroy() {
+          ipc.removeAllListeners("openDialog");
+        },
+        methods: {
+          onEvents() {
+            ipcRenderer.on("downloadedVersions", (event, versions) => {
+              this.downloadedVersions = versions;
+            });
+            ipcRenderer.on("getPrintersList", (event, printers) => {
+              this.printerList = printers;
+            });
+          },
+          handleTabChange() {
+            this.$nextTick(() => {
+              let { height, width } = document
+                .querySelector("#app")
+                .getBoundingClientRect();
+              height = Math.ceil(height);
+              width = Math.ceil(width);
+              ipc.send("setContentSize", {
+                width,
+                height,
+              });
+            });
+          },
+          /**
+           * @description: 测试连接
+           * @return {void}
+           */
+          handleTest() {
+            this.$refs.formRef.validate((valid) => {
+              if (valid) {
+                ipc.send("testTransit", {
+                  url: this.formData.transitUrl,
+                  token: this.formData.transitToken,
+                });
+              } else {
+                return false;
+              }
+            });
+          },
+          /**
+           * @description: 选择目录
+           * @param {string} type - 目录类型
+           * @return {void}
+           */
+          chooseDirectory(type) {
+            const title = {
+              logPath: "选择日志存储路径",
+              pdfPath: "选择 PDF 缓存路径",
+            }[type];
+            ipc.send("showOpenDialog", {
+              title,
+              defaultPath: this.formData[type],
+              properties: ["openDirectory"],
+            });
+            ipc.once("openDialog", (event, result) => {
+              if (!result.canceled) {
+                this.$set(this.formData, type, result.filePaths[0]);
+              }
+            });
+          },
+          /**
+           * @description: 打开目录
+           * @param {string} type - 目录类型
+           * @return {void}
+           */
+          openDirectory(type) {
+            if (this.formData[type]) {
+              ipc.send("openDirectory", this.formData[type]);
+            }
+          },
+          /**
+           * @description: 提交设置
+           * @return {void}
+           */
+          submit() {
+            this.$refs.formRef.validate((valid) => {
+              if (valid) {
+                ipc.send("setConfig", this.formData);
+              } else {
+                return false;
+              }
+            });
+          },
+          /**
+           * @description: 关闭窗口
+           * @return {void}
+           */
+          close() {
+            ipc.send("closeSetWindow");
+          },
+          /**
+           * @description: 获取在线版本信息
+           * @return {void}
+           */
+          getVersions() {
+            const xhr = new XMLHttpRequest();
+            // cnpm 源
+            xhr.open(
+              "GET",
+              "https://registry.npmmirror.com/vue-plugin-hiprint",
+            );
+            xhr.onload = () => {
+              if (xhr.status === 200) {
+                this.npmInfo = JSON.parse(xhr.responseText);
+                this.versions = _.orderBy(
+                  _.map(this.npmInfo.versions, ({ version }) => ({
+                    value: version,
+                    time: dayjs(this.npmInfo.time[version]).valueOf(),
+                    info: dayjs(this.npmInfo.time[version]).format(
+                      "YYYY/MM/DD HH:mm:ss",
+                    ),
+                  })),
+                  "time",
+                  "desc",
+                );
+              }
+            };
+            xhr.onerror = () => {
+              console.log("获取版本信息失败");
+            };
+            xhr.send();
+          },
+          /**
+           * @description: 获取打印机列表
+           * @return {void}
+           */
+          getPrintersList() {
+            ipcRenderer.send("getPrintersList"); // 请求打印机列表
+          },
+        },
+      });
+
+      Vue.component("render-component", {
+        props: {
+          render: Function,
+          data: Object,
+        },
+        render(h) {
+          return this.render(h, this.data);
+        },
+      });
+    </script>
+  </body>
+</html>

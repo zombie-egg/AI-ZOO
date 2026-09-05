@@ -1,0 +1,46 @@
+server {
+    listen ${PORT};
+    server_name _;
+    client_max_body_size 16m;
+
+    location = / {
+        return 302 /kiosk/;
+    }
+
+    location /kiosk/ {
+        alias /var/www/kiosk/;
+        try_files $uri $uri/ /kiosk/index.html;
+    }
+
+    location /private-delivery/ {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+
+    location = /healthz {
+        proxy_pass http://127.0.0.1:8000/healthz;
+    }
+
+    root /var/www/html/public;
+    index index.php index.html;
+
+    location / {
+        try_files $uri $uri/ /index.php?s=$uri&$args;
+    }
+
+    location ~ \.php$ {
+        include fastcgi_params;
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        fastcgi_param PATH_INFO $fastcgi_path_info;
+        fastcgi_param HTTP_X_KIOSK_TOKEN "${KIOSK_DEVICE_PROXY_TOKEN}";
+        fastcgi_pass 127.0.0.1:9000;
+        fastcgi_read_timeout 180s;
+    }
+
+    location ~ /\. {
+        deny all;
+    }
+}
+

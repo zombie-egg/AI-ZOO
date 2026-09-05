@@ -1,0 +1,221 @@
+# yaml-language-server: $schema=https://schema.zeabur.app/template.json
+apiVersion: zeabur.com/v1
+kind: Template
+metadata:
+  name: AI ZOO
+spec:
+  description: Multi-person AI zoo photo kiosk with local camera and printer agent.
+  tags:
+    - AI
+    - Tool
+  variables:
+    - key: AI_ZOO_DOMAIN
+      type: DOMAIN
+      name: Public domain
+      description: Zeabur generated domain for the AI ZOO kiosk.
+    - key: NEWAPI_BASE_URL
+      type: STRING
+      name: Primary image API base URL
+      description: OpenAI-compatible image API endpoint.
+    - key: NEWAPI_TOKEN
+      type: STRING
+      name: Primary image API token
+      description: Token for GPT-image-2.
+    - key: FALLBACK_IMAGE_BASE_URL
+      type: STRING
+      name: Fallback image API base URL
+      description: Gemini-compatible fallback endpoint.
+    - key: FALLBACK_IMAGE_API_KEY
+      type: STRING
+      name: Fallback image API key
+      description: Token for the fallback image provider.
+    - key: IMAGEFORGE_SECRET
+      type: STRING
+      name: ImageForge secret
+      description: Internal Luna-compatible authentication secret.
+    - key: IMAGEFORGE_SECRET_KEY
+      type: STRING
+      name: ImageForge secret key
+      description: Internal Luna-compatible authentication key.
+    - key: IMAGEFORGE_ACCESS_TOKEN
+      type: STRING
+      name: ImageForge access token
+      description: Internal upload API token.
+    - key: IMAGEFORGE_INTERNAL_TOKEN
+      type: STRING
+      name: ImageForge internal token
+      description: Token used by PHP to call ImageForge.
+    - key: SIGNING_SECRET
+      type: STRING
+      name: Delivery signing secret
+      description: Secret used to sign private result URLs.
+    - key: KIOSK_DEVICE_PROXY_TOKEN
+      type: STRING
+      name: Kiosk proxy token
+      description: Server-side token injected by Nginx for kiosk API requests.
+  readme: |-
+    # AI ZOO
+    The cloud service hosts the kiosk UI, API, generation pipeline, MySQL and Redis.
+    Camera capture and physical printing continue to run on the on-site computer.
+  services:
+    - name: mysql
+      template: PREBUILT_V2
+      spec:
+        source:
+          image: mysql:8.0
+        ports:
+          - id: database
+            port: 3306
+            type: TCP
+        volumes:
+          - id: data
+            dir: /var/lib/mysql
+        env:
+          MYSQL_DATABASE:
+            default: ai_zoo
+            expose: true
+          MYSQL_USER:
+            default: ai_zoo
+            expose: true
+          MYSQL_PASSWORD:
+            default: ${PASSWORD}
+            expose: true
+          MYSQL_ROOT_PASSWORD:
+            default: ${PASSWORD}
+          AI_ZOO_MYSQL_HOST:
+            default: ${CONTAINER_HOSTNAME}
+            expose: true
+            readonly: true
+          AI_ZOO_MYSQL_PORT:
+            default: ${DATABASE_PORT}
+            expose: true
+            readonly: true
+          AI_ZOO_MYSQL_DATABASE:
+            default: ${MYSQL_DATABASE}
+            expose: true
+            readonly: true
+          AI_ZOO_MYSQL_USER:
+            default: ${MYSQL_USER}
+            expose: true
+            readonly: true
+          AI_ZOO_MYSQL_PASSWORD:
+            default: ${MYSQL_PASSWORD}
+            expose: true
+            readonly: true
+    - name: redis
+      template: PREBUILT_V2
+      spec:
+        source:
+          image: redis:7-alpine
+        command:
+          - redis-server
+          - --appendonly
+          - "yes"
+        ports:
+          - id: database
+            port: 6379
+            type: TCP
+        volumes:
+          - id: data
+            dir: /data
+        env:
+          AI_ZOO_REDIS_HOST:
+            default: ${CONTAINER_HOSTNAME}
+            expose: true
+            readonly: true
+          AI_ZOO_REDIS_PORT:
+            default: ${DATABASE_PORT}
+            expose: true
+            readonly: true
+          AI_ZOO_REDIS_PASSWORD:
+            default: ""
+            expose: true
+    - name: ai-zoo-web
+      template: GIT
+      domainKey: AI_ZOO_DOMAIN
+      dependencies:
+        - mysql
+        - redis
+      spec:
+        source:
+          source: GITHUB
+          repo: 1358217134
+          branch: main
+          rootDirectory: .
+        ports:
+          - id: web
+            port: 8080
+            type: HTTP
+        volumes:
+          - id: imageforge-data
+            dir: /data/imageforge
+          - id: php-runtime
+            dir: /var/www/html/runtime
+        env:
+          PORT:
+            default: "8080"
+          MYSQL_HOST:
+            default: ${AI_ZOO_MYSQL_HOST}
+          MYSQL_PORT:
+            default: ${AI_ZOO_MYSQL_PORT}
+          MYSQL_DATABASE:
+            default: ${AI_ZOO_MYSQL_DATABASE}
+          MYSQL_USERNAME:
+            default: ${AI_ZOO_MYSQL_USER}
+          MYSQL_PASSWORD:
+            default: ${AI_ZOO_MYSQL_PASSWORD}
+          REDIS_HOST:
+            default: ${AI_ZOO_REDIS_HOST}
+          REDIS_PORT:
+            default: ${AI_ZOO_REDIS_PORT}
+          REDIS_PASSWORD:
+            default: ${AI_ZOO_REDIS_PASSWORD}
+          LUNA_UPSTREAM:
+            default: imageforge
+          LUNA_BASE_URL:
+            default: http://127.0.0.1:8000
+          LUNA_PHASE1_STUB_ENABLED:
+            default: "false"
+          IMAGEFORGE_SECRET:
+            default: ${IMAGEFORGE_SECRET}
+          IMAGEFORGE_SECRET_KEY:
+            default: ${IMAGEFORGE_SECRET_KEY}
+          IMAGEFORGE_ACCESS_TOKEN:
+            default: ${IMAGEFORGE_ACCESS_TOKEN}
+          IMAGEFORGE_INTERNAL_TOKEN:
+            default: ${IMAGEFORGE_INTERNAL_TOKEN}
+          KIOSK_DEVICE_PROXY_TOKEN:
+            default: ${KIOSK_DEVICE_PROXY_TOKEN}
+          NEWAPI_BASE_URL:
+            default: ${NEWAPI_BASE_URL}
+          NEWAPI_TOKEN:
+            default: ${NEWAPI_TOKEN}
+          GPT_IMAGE_MODEL:
+            default: gpt-image-2
+          FALLBACK_IMAGE_BASE_URL:
+            default: ${FALLBACK_IMAGE_BASE_URL}
+          FALLBACK_IMAGE_API_KEY:
+            default: ${FALLBACK_IMAGE_API_KEY}
+          FALLBACK_IMAGE_MODEL:
+            default: gemini-3.1-flash-image-preview
+          PUBLIC_BASE_URL:
+            default: https://${AI_ZOO_DOMAIN}
+          CORS_ALLOWED_ORIGINS:
+            default: https://${AI_ZOO_DOMAIN}
+          DATABASE_PATH:
+            default: /data/imageforge/imageforge.db
+          PRIVATE_DIR:
+            default: /data/imageforge/private
+          SIGNING_SECRET:
+            default: ${SIGNING_SECRET}
+          FACE_ENGINE:
+            default: local
+          KIOSK_OPERATOR_TEST_MODE:
+            default: "false"
+localization:
+  zh-CN:
+    description: 支持 1–4 人逐人四连拍、AI 动物合照生成、人工验图与本地打印的完整系统。
+    variables:
+      - key: AI_ZOO_DOMAIN
+        name: 公网域名
+        description: 为 AI ZOO 自动绑定的 Zeabur 域名。

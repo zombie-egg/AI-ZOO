@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+      }
+      ::-webkit-scrollbar {
+        display: none;
+      }
+    </style>
+    <title>打印窗口</title>
+  </head>
+
+  <body>
+    <div id="printElement"></div>
+    <script>
+      const { ipcRenderer } = require("electron");
+      const Store = require("electron-store");
+
+      const store = new Store();
+
+      window.$ = window.jQuery = require("jquery");
+      window.autoConnect = false;
+
+      window.Nzh = require("nzh");
+
+      window["bwip-js"] = require("bwip-js");
+
+      window.JsBarcode = require("jsbarcode");
+
+      window.template = undefined;
+
+      window.io = () => {};
+
+      // 用于判断是否为打包版本
+      const isPackaged = location.href.includes("app.asar");
+      // 用于判断当前系统
+      const platform = process.platform;
+
+      // 获取模板json. string或者json 统一处理
+      const getTemplateJson = (val) => {
+        try {
+          let template = val;
+          if ("string" == typeof template) {
+            template = JSON.parse(template);
+          }
+          if ("object" != typeof template) {
+            throw new Error("模板格式错误");
+          }
+          if (template.panels && template.panels.length === 0) {
+            throw new Error("模板格式错误");
+          }
+          return template;
+        } catch (error) {
+          ipcRenderer.send("showMessageBox", {
+            title: "模板格式错误",
+            message: `请传入正确的模板json`,
+            type: "error",
+            buttons: ["我知道了"],
+          });
+        }
+      };
+
+      $(document).ready(function() {
+        const script = document.createElement("script");
+        script.setAttribute("type", "text/javascript");
+
+        // 加载插件
+        let scriptSrc = `../plugin/${store.get(
+          "pluginVersion",
+        )}_vue-plugin-hiprint.js`;
+
+        // 打包版本路径特殊处理
+        if (isPackaged) {
+          scriptSrc = `../../plugin/${store.get(
+            "pluginVersion",
+          )}_vue-plugin-hiprint.js`;
+        }
+
+        script.setAttribute("src", scriptSrc);
+        script.onload = () => {
+          hiprint = window["vue-plugin-hiprint"].hiprint;
+
+          ipcRenderer.on("png", (event, data) => {
+            // 滚动窗口滚动条到左上角
+            window.scrollTo(0, 0);
+            let html = data.html;
+            if (data.template) {
+              window.template = new hiprint.PrintTemplate({
+                template: data.template,
+              });
+              html = window.template.getHtml(data.data);
+            }
+            const printElement = $("#printElement");
+            printElement.html(html);
+            const rects = Array.from(
+              printElement.find(".hiprint-printPaper"),
+            ).map((el) => el.getBoundingClientRect());
+            const capturePageData = {
+              ...data,
+              templateId: data.templateId || template.id,
+              x: rects[0].x,
+              y: rects[0].y,
+              width: rects[0].width,
+              height: rects.pop().bottom,
+            };
+            setTimeout(() => {
+              ipcRenderer.send("capturePage", capturePageData);
+            });
+          });
+
+          ipcRenderer.on("pdf", (event, data) => {
+            let html = data.html;
+            if (data.template) {
+              let template = getTemplateJson(data.template);
+              window.template = new hiprint.PrintTemplate({
+                template: template,
+              });
+              html = window.template.getHtml(data.data);
+            }
+            $("#printElement").html(html);
+            setTimeout(() => {
+              ipcRenderer.send("printToPDF", {
+                ...data,
+                templateId: data.templateId || template.id,
+              });
+            });
+          });
+
+          ipcRenderer.on("print", (event, data) => {
+            let html = data.html;
+            if (data.template) {
+              let template = getTemplateJson(data.template);
+              window.template = new hiprint.PrintTemplate({
+                template: template,
+              });
+              html = window.template.getHtml(data.data);
+            }
+            $("#printElement").html(html);
+            setTimeout(() => {
+              ipcRenderer.send("print", {
+                ...data,
+                html: html[0].innerHTML,
+                templateId: data.templateId || template.id,
+                pageNum: $("#printElement .hiprint-printPaper").length,
+              });
+            });
+          });
+        };
+        script.onerror = () => {
+          ipcRenderer.send("showMessageBox", {
+            title: "插件加载错误",
+            message: `无法从插件缓存中加载【${store.get(
+              "pluginVersion",
+            )}】版本，请重新在设置中指定版本！`,
+            type: "error",
+            buttons: ["我知道了"],
+          });
+        };
+
+        const head = document.querySelector("head");
+
+        let cssSrc = `../plugin/${store.get("pluginVersion")}_print-lock.css`;
+
+        // mac 打包版本路径特殊处理
+        if (isPackaged) {
+          cssSrc = `../../plugin/${store.get("pluginVersion")}_print-lock.css`;
+        }
+
+        head.append(
+          $(
+            `<link rel="stylesheet" type="text/css" media="print" href="${cssSrc}">`,
+          )[0],
+        );
+        head.append(script);
+      });
+    </script>
+  </body>
+</html>

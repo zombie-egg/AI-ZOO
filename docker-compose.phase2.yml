@@ -1,0 +1,64 @@
+name: luna-phase2
+
+include:
+  - path: docker-compose.phase1.yml
+
+services:
+  php:
+    environment:
+      COMPOSER_CACHE_DIR: /tmp/composer-cache
+      APP_DEBUG: "true"
+      LUNA_UPSTREAM: imageforge
+      LUNA_BASE_URL: http://imageforge:8000
+      LUNA_PHASE1_STUB_ENABLED: "false"
+      LUNA_SECRET: ${IMAGEFORGE_SECRET:-change-me}
+      LUNA_SECRET_KEY: ${IMAGEFORGE_SECRET_KEY:-change-me-too}
+      IMAGEFORGE_BASE_URL: http://imageforge:8000
+      IMAGEFORGE_INTERNAL_TOKEN: ${IMAGEFORGE_INTERNAL_TOKEN:-change-internal-token}
+      KIOSK_DEVICE_PROXY_TOKEN: ${KIOSK_DEVICE_PROXY_TOKEN:-local-kiosk-test-token}
+    depends_on:
+      imageforge:
+        condition: service_healthy
+
+  queue:
+    environment:
+      COMPOSER_CACHE_DIR: /tmp/composer-cache
+      LUNA_UPSTREAM: imageforge
+      LUNA_BASE_URL: http://imageforge:8000
+      LUNA_PHASE1_STUB_ENABLED: "false"
+      LUNA_SECRET: ${IMAGEFORGE_SECRET:-change-me}
+      LUNA_SECRET_KEY: ${IMAGEFORGE_SECRET_KEY:-change-me-too}
+      IMAGEFORGE_BASE_URL: http://imageforge:8000
+      IMAGEFORGE_INTERNAL_TOKEN: ${IMAGEFORGE_INTERNAL_TOKEN:-change-internal-token}
+      KIOSK_DEVICE_PROXY_TOKEN: ${KIOSK_DEVICE_PROXY_TOKEN:-local-kiosk-test-token}
+    depends_on:
+      imageforge:
+        condition: service_healthy
+
+  imageforge:
+    build:
+      context: ./imageforge
+    env_file:
+      - ./imageforge/.env
+    environment:
+      IMAGEFORGE_SECRET: ${IMAGEFORGE_SECRET:-change-me}
+      IMAGEFORGE_SECRET_KEY: ${IMAGEFORGE_SECRET_KEY:-change-me-too}
+      IMAGEFORGE_ACCESS_TOKEN: ${IMAGEFORGE_ACCESS_TOKEN:-change-access-token}
+      IMAGEFORGE_INTERNAL_TOKEN: ${IMAGEFORGE_INTERNAL_TOKEN:-change-internal-token}
+      PUBLIC_BASE_URL: http://localhost:${IMAGEFORGE_HTTP_PORT:-8000}
+      DATABASE_PATH: /data/imageforge.db
+      PRIVATE_DIR: /data/private
+      FACE_ENGINE: ${FACE_ENGINE:-local}
+    ports:
+      - "127.0.0.1:${IMAGEFORGE_HTTP_PORT:-8000}:8000"
+    volumes:
+      - imageforge-data:/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=3)"]
+      interval: 5s
+      timeout: 4s
+      retries: 30
+    restart: unless-stopped
+
+volumes:
+  imageforge-data:

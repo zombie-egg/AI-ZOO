@@ -1,0 +1,144 @@
+<!--
+ * @Date: 2022-09-13 11:11:52
+ * @LastEditors: admin@54xavier.cn
+ * @LastEditTime: 2024-04-05 13:08:31
+ * @FilePath: \electron-hiprint\assets\index.html
+-->
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>Electron-hiprint</title>
+    <link rel="stylesheet" href="./css/style.css" />
+    <link rel="stylesheet" href="./element-ui/index.css" />
+    <script src="./js/vue.min.js"></script>
+    <script src="./element-ui/index.js"></script>
+  </head>
+
+  <body>
+    <div id="app" class="box">
+      <div class="background">
+        <div class="bg-primary" :class="{active: !transitActiveFlag}"></div>
+        <div
+          class="bg-success"
+          :class="{active: socketActiveNum || transitActiveFlag}"
+        ></div>
+        <div class="bg-warning" :class="{active: printing}"></div>
+      </div>
+      <div class="container">
+        <div class="info">
+          <div class="title">
+            打印服务已启动
+            <i
+              class="el-icon-view privateIcon"
+              :class="{ hidden: !displayPrivate }"
+              :title="displayPrivate ? '隐藏重要数据' : '显示重要数据'"
+              @click="handleTriggerView"
+            ></i>
+            <i
+              class="el-icon-setting setIcon"
+              title="进入设置"
+              @click="openSetting"
+            ></i>
+          </div>
+          <div class="message row ipAddress">
+            服务地址：<span data-prop="ipAddress" @click="handleCopy">{{ privateData(ipAddress) }}</span>
+          </div>
+          <div class="message row">
+            MAC地址：<span data-prop="macAddress" @click="handleCopy">{{ privateData(macAddress) }}</span>
+          </div>
+        </div>
+        <div class="status">
+          <div class="message">
+            中转状态: <span>{{ transitActiveFlag ? '已' : '未' }}连接</span>
+          </div>
+          <div class="message">
+            本地连接：
+            <span>
+              {{ socketActiveNum ? `已建立 ${socketActiveNum} 条` : '未' }}连接
+            </span>
+          </div>
+          <div class="message">
+            打印状态：<span>{{ printing ? "文档打印中" : "空闲" }}</span>
+          </div>
+          <div class="message row">
+            设备编号：<span data-prop="deviceId" @click="handleCopy">{{ privateData(deviceId) }}</span>
+          </div>
+          <div class="message">
+            插件版本：{{ pluginVersion }}
+          </div>
+          <div class="message">
+            客户端版本：{{ version }}
+          </div>
+        </div>
+      </div>
+    </div>
+    <script type="text/javascript">
+      const { ipcRenderer, clipboard } = require("electron");
+      const Store = require("electron-store");
+      const store = new Store();
+
+      const { version } = require("../package.json");
+
+      document.title = store.get("mainTitle") || "Electron-hiprint";
+
+      let ipc = ipcRenderer;
+      new Vue({
+        el: "#app",
+        data: () => {
+          return {
+            macAddress: "",
+            ipAddress: "",
+            deviceId: "",
+            transitActiveFlag: false,
+            socketActiveNum: 0,
+            printing: false,
+            pluginVersion: store.get("pluginVersion") || "未指定",
+            displayPrivate: true,
+            version,
+          };
+        },
+        created() {
+          ipc.send("getMachineId");
+          ipc.on("machineId", (event, arg) => {
+            this.deviceId = arg;
+          });
+          ipc.send("getAddress");
+          ipc.on("address", (event, arg) => {
+            this.ipAddress = `http://${arg.ip}:${arg.port || 17521}`;
+            this.macAddress = arg.mac;
+          });
+          ipc.on("serverConnection", this.socketActive);
+          ipc.on("printTask", (event, arg) => {
+            this.printing = arg;
+          });
+          ipc.on("clientConnection", this.transitActive);
+        },
+        methods: {
+          openSetting() {
+            ipc.send("openSetting");
+          },
+          handleTriggerView() {
+            this.displayPrivate = !this.displayPrivate;
+          },
+          handleCopy(event) {
+            clipboard.writeText(this[event.target.dataset.prop]);
+            ipc.send("notification", {
+              title: "复制成功",
+              body: "文本已成功复制到剪贴板中！",
+            });
+          },
+          privateData(data) {
+            return this.displayPrivate ? data.replace(/[a-zA-Z0-9]/g, "*") : data
+          },
+          socketActive(evnet, arg) {
+            this.socketActiveNum = arg;
+          },
+          transitActive(event, arg) {
+            this.transitActiveFlag = arg;
+          },
+        },
+      });
+    </script>
+  </body>
+</html>

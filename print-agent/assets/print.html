@@ -1,0 +1,112 @@
+<!--
+ * @Date: 2023-10-05 18:00:07
+ * @LastEditors: admin@54xavier.cn
+ * @LastEditTime: 2024-12-15 02:48:55
+ * @FilePath: /electron-hiprint/assets/print.html
+-->
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>打印窗口</title>
+    <link href="./css/print-lock.css" rel="stylesheet" />
+    <link href="./css/print-lock.css" media="print" rel="stylesheet" />
+    <style>
+      body {
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+      }
+    </style>
+    <script>
+      window.$ = window.jQuery = require("jquery");
+      $.fn.onImgLoaded = (callback) => {
+        let cb = (len) => {
+          if (len <= 0) {
+            callback();
+          }
+        };
+        let len = $("img").length;
+        cb(len);
+        let getUrl = (str) => {
+          let reg = /(https?|http|ftp|file):\/\/[-A-Za-z0-9+&@#/%?=~_|!:,.;]+[-A-Za-z0-9+&@#/%=~_|]/g;
+          let v = str.match(reg);
+          if (v && v.length) {
+            return v[0];
+          }
+          return "";
+        };
+        $("img").each((i, e) => {
+          let $img = $(e);
+          let img = new Image();
+          let src = $img.attr("src");
+          if (!new RegExp("[a-zA-Z]+://[^\s]*").test(src)) {
+            src = getUrl($img.attr("style") || "");
+          }
+          img.src = src;
+          if (img.complete || src == "") {
+            len--;
+            cb(len);
+          } else {
+            img.onload = () => {
+              len--;
+              cb(len);
+            };
+            img.onerror = () => {
+              len--;
+              cb(len);
+            };
+          }
+        });
+      };
+    </script>
+  </head>
+
+  <body>
+    <div id="printElement"></div>
+    <script>
+      const { ipcRenderer } = require("electron");
+
+      function renderAndPrint(data) {
+        document.title = data.title ? data.title : "hiprint打印";
+        const container = document.getElementById("printElement");
+        container.innerHTML = data.html;
+        data.pageNum = Math.max(1, $(".hiprint-printPaper").length);
+        const images = Array.from(container.querySelectorAll("img"));
+        let sent = false;
+        const send = () => {
+          if (sent) return;
+          sent = true;
+          ipcRenderer.send("do", data);
+        };
+        if (!images.length) {
+          send();
+          return;
+        }
+        let pending = images.length;
+        const settled = () => {
+          pending -= 1;
+          if (pending <= 0) send();
+        };
+        images.forEach((image) => {
+          if (image.complete) settled();
+          else {
+            image.addEventListener("load", settled, { once: true });
+            image.addEventListener("error", settled, { once: true });
+          }
+        });
+        // 图片服务异常时也必须给主进程回调，避免打印队列永久卡死。
+        setTimeout(send, 15000);
+      }
+
+      $(document).ready(function() {
+        ipcRenderer.on("print-new", (event, data) => {
+          renderAndPrint(data);
+        });
+        ipcRenderer.on("reprint", (event, data) => {
+          renderAndPrint(data);
+        });
+      });
+    </script>
+  </body>
+</html>

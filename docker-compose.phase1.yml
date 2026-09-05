@@ -1,0 +1,118 @@
+name: luna-phase1
+
+services:
+  mysql:
+    image: m.daocloud.io/docker.io/library/mysql:8.0
+    environment:
+      MYSQL_DATABASE: ${PHASE1_MYSQL_DATABASE:-loxi_luna_test}
+      MYSQL_USER: ${PHASE1_MYSQL_USER:-luna}
+      MYSQL_PASSWORD: ${PHASE1_MYSQL_PASSWORD:-phase1-local-only}
+      MYSQL_ROOT_PASSWORD: ${PHASE1_MYSQL_ROOT_PASSWORD:-phase1-root-local-only}
+      TZ: Asia/Shanghai
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    volumes:
+      - phase1-mysql:/var/lib/mysql
+      - ./server/database/loxi_luna.sql:/docker-entrypoint-initdb.d/001-luna.sql:ro
+      - ./server/database/phase3_kiosk.sql:/docker-entrypoint-initdb.d/003-kiosk.sql:ro
+      - ./server/database/phase4_direct_generation.sql:/docker-entrypoint-initdb.d/004-direct-generation.sql:ro
+      - ./server/database/phase5_pose_selection.sql:/docker-entrypoint-initdb.d/005-pose-selection.sql:ro
+      - ./server/database/phase6_multi_participant.sql:/docker-entrypoint-initdb.d/006-multi-participant.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$${MYSQL_ROOT_PASSWORD} --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - phase1-redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  php:
+    build:
+      context: .
+      dockerfile: docker/phase1/php/Dockerfile
+    working_dir: /var/www/html
+    environment:
+      COMPOSER_CACHE_DIR: /tmp/composer-cache
+    volumes:
+      - ./server:/var/www/html
+      - phase1-php-vendor:/var/www/html/vendor
+      - ./docker/phase1/php/phase1.ini:/usr/local/etc/php/conf.d/phase1.ini:ro
+      - phase1-composer-cache:/tmp/composer-cache
+    depends_on:
+      luna-stub:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  queue:
+    build:
+      context: .
+      dockerfile: docker/phase1/php/Dockerfile
+    working_dir: /var/www/html
+    environment:
+      COMPOSER_CACHE_DIR: /tmp/composer-cache
+    command: ["php", "think", "queue:listen", "--sleep", "1"]
+    volumes:
+      - ./server:/var/www/html
+      - phase1-php-vendor:/var/www/html/vendor
+      - ./docker/phase1/php/phase1.ini:/usr/local/etc/php/conf.d/phase1.ini:ro
+      - phase1-composer-cache:/tmp/composer-cache
+    depends_on:
+      luna-stub:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  luna-stub:
+    build:
+      context: .
+      dockerfile: docker/phase1/php/Dockerfile
+    working_dir: /stub
+    command: ["php", "-S", "0.0.0.0:8090", "/stub/router.php"]
+    environment:
+      PHASE1_LUNA_STUB_SECRET: phase1-offline-secret
+      PHASE1_LUNA_STUB_SECRET_KEY: phase1-offline-secret-key
+      PHASE1_LUNA_STUB_TOKEN: phase1-offline-token
+    volumes:
+      - ./docker/phase1/luna-stub:/stub:ro
+    healthcheck:
+      test: ["CMD", "php", "-r", "exit(@file_get_contents('http://127.0.0.1:8090/healthz') ? 0 : 1);"]
+      interval: 3s
+      timeout: 2s
+      retries: 20
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "${PHASE1_HTTP_PORT:-8080}:80"
+    volumes:
+      - ./server:/var/www/html:ro
+      - ./docker/phase1/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - php
+    restart: unless-stopped
+
+volumes:
+  phase1-mysql:
+  phase1-redis:
+  phase1-composer-cache:
+  phase1-php-vendor:

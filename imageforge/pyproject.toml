@@ -1,0 +1,32 @@
+[project]
+name = "imageforge"
+version = "0.2.0"
+description = "AI 动物合照机：四张顾客原图 + 固定场景 Prompt 直连 GPT-image-2"
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi==0.116.1",
+  "httpx==0.28.1",
+  "opencv-python-headless==4.12.0.88",
+  "Pillow==11.3.0",
+  "pydantic-settings==2.10.1",
+  "python-multipart==0.0.20",
+  "uvicorn[standard]==0.35.0",
+]
+
+[project.optional-dependencies]
+test = ["pytest==8.4.1", "pytest-cov==6.2.1"]
+
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["app"]
+
+[tool.pytest.ini_options]
+addopts = "-q"
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.ruff]
+line-length = 100

@@ -1,0 +1,15 @@
+Metadata-Version: 2.4
+Name: imageforge
+Version: 0.2.0
+Summary: AI 动物合照机：四张顾客原图 + 固定场景 Prompt 直连 GPT-image-2
+Requires-Python: >=3.11
+Requires-Dist: fastapi==0.116.1
+Requires-Dist: httpx==0.28.1
+Requires-Dist: opencv-python-headless==4.12.0.88
+Requires-Dist: Pillow==11.3.0
+Requires-Dist: pydantic-settings==2.10.1
+Requires-Dist: python-multipart==0.0.20
+Requires-Dist: uvicorn[standard]==0.35.0
+Provides-Extra: test
+Requires-Dist: pytest==8.4.1; extra == "test"
+Requires-Dist: pytest-cov==6.2.1; extra == "test"

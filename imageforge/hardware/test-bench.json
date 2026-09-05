@@ -1,0 +1,26 @@
+{
+  "captured_at": "2026-08-27T18:15:00+08:00",
+  "camera": {
+    "preferred_device": "1200W Camera",
+    "windows_status": "OK",
+    "transport": "USB DirectShow",
+    "still_profile": {"codec": "mjpeg", "width": 4000, "height": 3000, "fps": 15},
+    "fast_preview_profile": {"codec": "mjpeg", "width": 1920, "height": 1080, "fps": 30},
+    "fallback_device": "HD Webcam",
+    "actual_frame_capture_verified": false,
+    "note": "设备和模式已探测；尚未主动采集现场画面，避免在未布置拍摄区时记录私人环境。"
+  },
+  "printer": {
+    "model": "Canon SELPHY CP1500",
+    "windows_status": "not_connected",
+    "technology": "dye-sublimation",
+    "connection_for_test": "USB Type-C",
+    "paper_profile": "postcard",
+    "print_width_mm": 100,
+    "print_height_mm": 148,
+    "dpi": 300,
+    "pixel_width": 1181,
+    "pixel_height": 1748,
+    "physical_test_verified": false
+  }
+}

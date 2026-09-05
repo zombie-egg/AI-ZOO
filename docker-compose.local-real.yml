@@ -1,0 +1,33 @@
+name: luna-phase1
+
+include:
+  - path: docker-compose.phase1.yml
+
+services:
+  php:
+    environment:
+      COMPOSER_CACHE_DIR: /tmp/composer-cache
+      APP_DEBUG: "true"
+      LUNA_UPSTREAM: imageforge
+      LUNA_BASE_URL: http://host.docker.internal:8000
+      LUNA_PHASE1_STUB_ENABLED: "false"
+      LUNA_SECRET: change-me
+      LUNA_SECRET_KEY: change-me-too
+      IMAGEFORGE_BASE_URL: http://host.docker.internal:8000
+      IMAGEFORGE_INTERNAL_TOKEN: change-internal-token
+      KIOSK_DEVICE_PROXY_TOKEN: local-kiosk-test-token
+      KIOSK_OPERATOR_TEST_MODE: "true"
+
+  queue:
+    environment:
+      COMPOSER_CACHE_DIR: /tmp/composer-cache
+      APP_DEBUG: "true"
+      LUNA_UPSTREAM: imageforge
+      LUNA_BASE_URL: http://host.docker.internal:8000
+      LUNA_PHASE1_STUB_ENABLED: "false"
+      LUNA_SECRET: change-me
+      LUNA_SECRET_KEY: change-me-too
+      IMAGEFORGE_BASE_URL: http://host.docker.internal:8000
+      IMAGEFORGE_INTERNAL_TOKEN: change-internal-token
+      KIOSK_DEVICE_PROXY_TOKEN: local-kiosk-test-token
+      KIOSK_OPERATOR_TEST_MODE: "true"
