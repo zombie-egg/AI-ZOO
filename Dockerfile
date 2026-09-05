@@ -1,4 +1,4 @@
-FROM node:20-alpine AS kiosk-builder
+FROM docker.1ms.run/library/node:20-alpine AS kiosk-builder
 
 WORKDIR /build/kiosk
 COPY kiosk/package*.json ./
@@ -6,7 +6,7 @@ RUN npm ci
 COPY kiosk/ ./
 RUN npm run build
 
-FROM php:8.2-fpm-bookworm
+FROM docker.1ms.run/library/php:8.2-fpm-bookworm
 
 ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONDONTWRITEBYTECODE=1 \
@@ -37,7 +37,7 @@ RUN apt-get update \
     && docker-php-ext-enable redis \
     && rm -rf /var/lib/apt/lists/*
 
-COPY --from=composer:2 /usr/bin/composer /usr/local/bin/composer
+COPY --from=docker.1ms.run/library/composer:2 /usr/bin/composer /usr/local/bin/composer
 
 WORKDIR /var/www/html
 COPY server/composer.json server/composer.lock ./
