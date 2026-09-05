@@ -107,10 +107,10 @@ spec:
       spec:
         source:
           image: redis:7-alpine
-        command:
-          - redis-server
-          - --appendonly
-          - "yes"
+          command:
+            - redis-server
+            - --appendonly
+            - "yes"
         ports:
           - id: database
             port: 6379
