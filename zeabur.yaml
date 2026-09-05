@@ -199,9 +199,9 @@ spec:
           FALLBACK_IMAGE_MODEL:
             default: gemini-3.1-flash-image-preview
           PUBLIC_BASE_URL:
-            default: https://${AI_ZOO_DOMAIN}
+            default: ${ZEABUR_WEB_URL}
           CORS_ALLOWED_ORIGINS:
-            default: https://${AI_ZOO_DOMAIN}
+            default: ${ZEABUR_WEB_URL}
           DATABASE_PATH:
             default: /data/imageforge/imageforge.db
           PRIVATE_DIR:
