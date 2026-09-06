@@ -57,7 +57,7 @@ has four consecutive references and references must never cross between particip
 - Image 2 within EACH group is the PRIMARY FRONT-FACE IDENTITY REFERENCE. Preserve that same real person's
   recognizable underlying facial structure, forehead, hairline, eyebrows, eye shape and spacing,
   nose geometry, lips, ears, age appearance, natural skin tone, and distinctive visible facial
-  details, while applying the controlled slimming and retouching explicitly required below.
+  details, while applying only the restrained natural retouching explicitly required below.
 - Images 3 and 4 within EACH group are LEFT and RIGHT THREE-QUARTER IDENTITY REFERENCES. Use them to keep
   the nose bridge, cheekbones, jaw contour, ears, and facial depth consistent.
 - The four images inside one group show one person. Different groups show different people. Never
@@ -70,32 +70,36 @@ NON-NEGOTIABLE PRIORITY ORDER:
 3. Person, animal, barriers, and environment must share believable physical space and lighting.
 4. The result must look like an ordinary real camera photograph, not advertising artwork.
 
-IDENTITY AND SMART BEAUTY RETOUCHING:
-Every visitor must remain unmistakably the same real person, but apply clearly visible, strong yet
-believable intelligent beauty retouching. These changes are required visible results, not optional
-suggestions, and must remain natural in a high-resolution printed photograph:
-- SKIN WHITENING AND TONE: visibly brighten and whiten the complexion, lift dull or uneven skin tone,
-  and improve facial luminosity while retaining the visitor's real undertone and avoiding blown-out
-  highlights, gray-white skin, or a mismatched face-versus-neck color.
-- SKIN SMOOTHING: apply noticeable, even skin smoothing; reduce minor blemishes, roughness, redness,
-  oily shine, and distracting pores, while keeping enough fine texture to remain photographic rather
-  than waxy, plastic, airbrushed, or porcelain-like.
-- FACE SLIMMING AND CONTOUR — HIGH PRIORITY: visibly narrow the apparent width of the outer cheeks
-  and lower face by approximately 10–15%, reduce excessive cheek fullness, create a cleaner and more
-  defined jawline, and visibly reduce a double chin when present. Compensate for wide-angle camera
-  distortion so the generated face must not look wider or heavier than the reference face. Keep the
-  result symmetrical and believable while preserving the person's recognizable cheekbones, chin,
-  nose, facial proportions, and identity. Never create an extreme V-shaped jaw, tiny chin, hollow
-  cheeks, pinched head, oversized eyes, or a different person.
-- EYE-AREA RETOUCHING: noticeably reduce dark circles, mild under-eye bags, and tired shadows while
-  preserving the natural lower-eyelid structure. Make the eyes look slightly clearer and more awake,
-  but do not enlarge the eyes or change their shape or spacing.
-- FINISH: gently soften harsh facial shadows, balance facial exposure, and keep the lips natural
-  without heavy makeup or artificial recoloring.
+IDENTITY PRESERVATION — HIGHEST PRIORITY:
+Keep each visitor's identity, facial features, facial structure, face shape, hairstyle, facial
+proportions, age appearance, and overall likeness completely consistent with that person's references.
+Do not redesign, idealize, replace, reshape, slim, widen, average, or reconstruct the face. The person
+must retain full recognizability and look like the same real individual photographed by the same camera.
 
-FACIAL EXPRESSION: Preserve each visitor's own natural, relaxed, neutral, candid expression. Do not
-ask for or add a smile. Keep the lips comfortably and naturally closed with no visible teeth, but do
-not press or tighten the mouth. Do not force, standardize, exaggerate, or copy expressions across people.
+NATURAL FACIAL EXPRESSION — OVERRIDES ANY CONFLICTING EXPRESSION WORDING IN THE SCENE:
+Correct any stiff or artificial expression and restore a natural, relaxed, calm everyday expression.
+Do not ask for or add a smile. Keep both lips comfortably and naturally closed and lightly touching:
+no open mouth, no visible teeth, no exaggerated smile, and no surprised expression. Keep the mouth
+corners naturally level; an extremely subtle restrained friendliness is acceptable, but they must not
+turn visibly upward. Do not press or tighten the lips.
+Keep the gaze relaxed and naturally directed toward the camera. Preserve the person's original eye
+size, shape, and spacing; never enlarge the eyes. Let the upper eyelids rest naturally and relax the
+muscles around the eyes to avoid a wide-eyed, vacant, startled, tense, or overexcited look. Keep the
+eyebrows in their natural position with no obvious raised-brow expression. Relax the cheeks, jaw, and
+all facial muscles without lifting the cheeks. Preserve the natural expression appropriate to each
+visitor's original age and gender presentation, with calm, candid, understated warmth. Do not force,
+standardize, exaggerate, or copy expressions across people.
+
+RESTRAINED NATURAL BEAUTY RETOUCHING:
+Apply light skin smoothing only to reduce minor blemishes and roughness. Even the skin tone and add a
+moderate, natural brightening and whitening effect without making the skin pale. Slightly reduce dark
+circles and dullness only. Preserve real pores, fine skin texture, normal facial volume, nose bridge,
+facial planes, shadows, and depth. No plastic skin, porcelain finish, airbrushing, heavy makeup, beauty
+filter, influencer-filter look, face slimming, V-shaped jaw, enlarged eyes, or changed facial anatomy.
+Keep the original photograph's lighting direction, color temperature, depth of field, camera character,
+and realism. The corrected face must blend naturally into the whole image and look genuinely captured
+by the original camera rather than redrawn by AI.
+
 Do not use face averaging or change age, ethnicity, gender, hairstyle, or distinctive facial details.
 Preserve normal facial asymmetry, the exact outfit from reference image 1, and glasses if present.
 Glasses must have physically plausible reflections that do not hide both eyes.
@@ -216,7 +220,8 @@ softly blurred educational sign with no readable text. No golden-hour glow and n
         _fixed_prompt("""
 A real red panda with accurate reddish coat, dark limbs, ringed tail, and natural proportions moves
 on a wooden climbing structure inside a leafy zoo habitat. The visitor stands at the public viewing
-rail, half turned toward the animal and smiling naturally toward the camera. The red panda remains
+rail, half turned toward the animal with a natural, relaxed expression toward the camera. The red
+panda remains
 in its protected habitat; no hugging, shoulder pose, or unsafe touching. Compose an imperfect
 friend-held waist-up smartphone snapshot. Use ordinary soft daylight filtered through leaves, with
 subtle green bounce on skin and clothing and matching contact shadows. Include natural branches,
@@ -248,7 +253,7 @@ a worn railing, and an unreadable blurred information board. No safari fantasy o
         _fixed_prompt("""
 One real giraffe with correct coat pattern, ossicones, long neck, muzzle, and scale leans curiously
 toward a zoo viewing window or protected feeding overlook. The visitor stands safely on the public
-side, slightly surprised and naturally smiling toward the camera, with no direct feeding or unsafe
+side with a calm, natural expression toward the camera, with no direct feeding or unsafe
 contact. Use a casual waist-up smartphone photo where the giraffe enters from one side of frame and
 the visitor is not perfectly centered. Preserve wide-angle perspective without distorting the
 visitor's face. Use soft open shade with warm-neutral daylight and mild green reflected light from
@@ -328,9 +333,9 @@ vegetation, glass seams, and blurred signage without readable text. No action-mo
         "capybara-lawn-beauty-v4",
         _fixed_prompt("""
 One calm, anatomically accurate capybara stands or sits in a staff-managed zoo encounter lawn. The
-visitor crouches or stands beside a low boundary at a believable distance, smiling naturally toward
-the camera. If proximity is shown, keep it consistent with a supervised encounter and use a railing
-or clear spatial cue; no hugging, lifting, costume, or human-like animal pose. Use a casual
+visitor crouches or stands beside a low boundary at a believable distance with a calm, natural
+expression toward the camera. If proximity is shown, keep it consistent with a supervised encounter
+and use a railing or clear spatial cue; no hugging, lifting, costume, or human-like animal pose. Use a casual
 friend-held smartphone snapshot with imperfect framing, believable ground contact, slight depth of
 field, and natural occlusion around the visitor's hand and the low rail. Soft afternoon cloud light
 and grass bounce affect skin, clothing, fur, and shadows consistently. Include ordinary lawn wear,
@@ -385,8 +390,9 @@ The final image must contain exactly {participant_count} human visitor{'s' if pa
 {groups}
 Keep every person's face, hairstyle, glasses, outfit, body shape, age, and skin undertone distinct.
 Never swap identities, blend two people into one face, duplicate a person, omit a person, or transfer
-clothing between people. Apply the complete whitening, smoothing, under-eye retouching, and visible
-10–15% face-slimming treatment independently to every visible face without making the faces alike.
+clothing between people. Apply the restrained natural skin smoothing, tone balancing, brightening, and
+minor under-eye correction independently to every visible face without changing any face shape or
+making the faces alike.
 Arrange shoulders, arms, hands, and depth naturally so bodies do not fuse or intersect."""
 
 
@@ -395,7 +401,7 @@ def compose_generation_prompt(scene: ScenePrompt, pose: PosePrompt, participant_
 
 
 def composed_prompt_version(scene: ScenePrompt, pose: PosePrompt, participant_count: int = 1) -> str:
-    return f"{scene.prompt_version}+{pose.prompt_version}+group-{participant_count}-v1+natural-expression-v2"
+    return f"{scene.prompt_version}+{pose.prompt_version}+group-{participant_count}-v1+natural-face-v3"
 
 
 def composed_prompt_hash(scene: ScenePrompt, pose: PosePrompt, participant_count: int = 1) -> str:
