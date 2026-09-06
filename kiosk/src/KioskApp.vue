@@ -13,7 +13,7 @@ import InfiniteGrid from "./components/ui/InfiniteGrid.vue";
 import { kioskConfig } from "./config";
 import { kioskApi } from "./services/api";
 import {
-  captureBestJpeg,
+  captureInstantJpeg,
   openPreferredCamera,
   stopCamera,
 } from "./services/camera";
@@ -316,14 +316,19 @@ async function takeShot() {
   if (!currentShot.value || busy.value || !cameraStream.value) return;
   busy.value = true;
   message.value = "";
+  const countdownStartedAt = performance.now();
   for (let number = 3; number >= 1; number -= 1) {
     countdown.value = number;
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    const deadline = countdownStartedAt + (4 - number) * 1000;
+    await new Promise((resolve) =>
+      setTimeout(resolve, Math.max(0, deadline - performance.now())),
+    );
   }
   countdown.value = 0;
   try {
-    message.value = "正在连拍 3 帧并选择最清晰的一张…";
-    const blob = await captureBestJpeg(videoEl.value, cameraStream.value, 3);
+    // The canvas freezes the frame immediately; JPEG encoding and upload happen afterwards.
+    const blob = await captureInstantJpeg(videoEl.value);
+    message.value = "已在倒计时结束时拍下，正在上传…";
     const uploaded = await kioskApi.uploadPhoto(
       order.value.id,
       blob,

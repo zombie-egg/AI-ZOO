@@ -61,6 +61,8 @@ npm start
 
 打开 `http://127.0.0.1:4175`。浏览器需要相机权限，macOS/Windows 需要给 Electron 打印权限并安装对应打印机驱动。
 
+其他现场电脑可直接使用 [`field-client/`](field-client/) 内的 macOS 或 Windows 启动脚本。摄像头和打印机均会自动回退到该电脑的系统默认设备，不再依赖当前 Mac 的设备名。
+
 ## Zeabur 部署
 
 仓库根目录的 `Dockerfile` 会构建 Kiosk，并在一个 Web 服务中运行 Nginx、PHP-FPM、队列和 ImageForge。`zeabur.yaml` 另外创建 MySQL、Redis、持久化卷和域名绑定。

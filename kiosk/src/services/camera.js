@@ -7,8 +7,8 @@ export async function openPreferredCamera(videoElement, preferredLabel) {
   }
   const cameras = devices.filter((item) => item.kind === 'videoinput')
   const preferred = cameras.find((item) => item.label.includes(preferredLabel))
-  if (!preferred && preferredLabel) {
-    throw new Error(`没有找到指定摄像头“${preferredLabel}”，当前可用：${cameras.map((item) => item.label || '未命名摄像头').join('、')}`)
+  if (!cameras.length) {
+    throw new Error('没有找到可用摄像头')
   }
   const stream = await navigator.mediaDevices.getUserMedia({
     audio: false,
@@ -35,6 +35,12 @@ async function videoFrameBlob(videoElement) {
   canvas.height = videoElement.videoHeight || 1080
   canvas.getContext('2d', { alpha: false }).drawImage(videoElement, 0, 0, canvas.width, canvas.height)
   return await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.95))
+}
+
+// Draw the frame before JPEG encoding so the captured moment is exactly when
+// the countdown reaches zero, independent of USB still-photo latency.
+export async function captureInstantJpeg(videoElement) {
+  return videoFrameBlob(videoElement)
 }
 
 async function stillPhotoBlob(stream, videoElement) {

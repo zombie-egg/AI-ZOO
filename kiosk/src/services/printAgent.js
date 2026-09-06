@@ -13,7 +13,8 @@ function resolvePrinterName(printers = []) {
   const candidates = Array.isArray(printers) ? printers : []
   const exact = candidates.find((printer) => normalizePrinterName(printer?.name) === configured)
   const selphy = candidates.find((printer) => normalizePrinterName(printer?.name).includes('canonselphycp1500'))
-  return exact?.name || selphy?.name || kioskConfig.printerName
+  const systemDefault = candidates.find((printer) => printer?.isDefault)
+  return exact?.name || selphy?.name || systemDefault?.name || candidates[0]?.name || kioskConfig.printerName
 }
 
 export function connectPrintAgent(onStatus) {
