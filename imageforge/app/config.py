@@ -38,7 +38,8 @@ class Settings(BaseSettings):
     gpt_image_api_key: str = ""
     gpt_image_base_url: str = ""
     gpt_image_model: str = "gpt-image-2"
-    image_provider_override: str = ""
+    # Gemini 是生产环境唯一默认生图供应商；mock/qwen 仅供显式测试或调试。
+    image_provider_override: str = "gemini"
 
     # 第二图片供应商只在主供应商请求失败时启用。
     fallback_image_base_url: str = ""
