@@ -253,23 +253,27 @@ async function createWindow() {
         MAIN_WINDOW.webContents.openDevTools();
       }
       // 本地服务开启端口监听
-      server.listen(store.get("port") || 17521);
+      // 本地端口仅供代理内部兼容使用；云端 Kiosk 不再访问此端口。
+      server.listen(store.get("port") || 17521, "127.0.0.1");
       // 初始化本地 服务端事件
       initServeEvent(ioServer);
       // 有配置中转服务时连接中转服务
+      const cloudTransitUrl = process.env.AI_ZOO_PRINT_RELAY_URL;
+      const cloudTerminalId = process.env.AI_ZOO_TERMINAL_ID;
+      const transitUrl = cloudTransitUrl || store.get("transitUrl");
       if (
-        store.get("connectTransit") &&
-        store.get("transitUrl") &&
-        store.get("transitToken")
+        (cloudTransitUrl && cloudTerminalId) ||
+        (store.get("connectTransit") && transitUrl && store.get("transitToken"))
       ) {
-        global.SOCKET_CLIENT = ioClient(store.get("transitUrl"), {
+        global.SOCKET_CLIENT = ioClient(transitUrl, {
+          path: cloudTransitUrl ? "/print-relay/socket.io" : "/socket.io",
           transports: ["websocket"],
           query: {
             client: "electron-hiprint",
           },
-          auth: {
-            token: store.get("transitToken"),
-          },
+          auth: cloudTransitUrl
+            ? { role: "agent", terminalId: cloudTerminalId }
+            : { token: store.get("transitToken") },
         });
 
         // 初始化中转 客户端事件

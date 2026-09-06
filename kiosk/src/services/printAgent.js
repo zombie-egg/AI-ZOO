@@ -3,6 +3,25 @@ import { kioskConfig } from '../config'
 
 let socket
 let activePrinterName = kioskConfig.printerName
+const terminalStorageKey = 'ai-zoo-print-terminal'
+
+function validTerminalId(value = '') {
+  return /^[A-Za-z0-9_-]{32,128}$/.test(String(value))
+}
+
+export function resolveTerminalId() {
+  const params = new URLSearchParams(globalThis.location?.search || '')
+  const supplied = params.get('terminal') || ''
+  if (validTerminalId(supplied)) {
+    globalThis.localStorage?.setItem(terminalStorageKey, supplied)
+    params.delete('terminal')
+    const query = params.toString()
+    globalThis.history?.replaceState({}, '', `${globalThis.location.pathname}${query ? `?${query}` : ''}${globalThis.location.hash}`)
+    return supplied
+  }
+  const stored = globalThis.localStorage?.getItem(terminalStorageKey) || ''
+  return validTerminalId(stored) ? stored : ''
+}
 
 function normalizePrinterName(value = '') {
   return String(value).toLowerCase().replace(/[^a-z0-9]+/g, '')
@@ -18,18 +37,33 @@ function resolvePrinterName(printers = []) {
 }
 
 export function connectPrintAgent(onStatus) {
-  const auth = kioskConfig.printAgentToken ? { token: kioskConfig.printAgentToken } : undefined
-  socket = io(kioskConfig.printAgentUrl, {
-    transports: ['websocket'], auth, reconnection: true,
+  const terminalId = resolveTerminalId()
+  if (!terminalId) {
+    onStatus?.({ online: false, paired: false, message: '此电脑尚未安装或绑定后台打印服务' })
+    return null
+  }
+  socket = io(kioskConfig.printRelayUrl, {
+    path: kioskConfig.printRelayPath,
+    transports: ['websocket'],
+    auth: { role: 'kiosk', terminalId },
+    reconnection: true,
   })
-  socket.on('connect', () => onStatus?.({ online: true, message: '打印代理在线' }))
-  socket.on('disconnect', () => onStatus?.({ online: false, message: '打印代理离线' }))
-  socket.on('connect_error', (error) => onStatus?.({ online: false, message: error?.message || '打印代理连接失败' }))
+  socket.on('connect', () => {
+    onStatus?.({ online: false, paired: true, message: '正在等待后台打印服务' })
+    socket.emit('refreshPrinterList')
+  })
+  socket.on('agentStatus', (state) => {
+    const agentOnline = Boolean(state?.online)
+    onStatus?.({ online: false, paired: true, message: agentOnline ? '正在检测本机打印机' : '后台打印服务离线' })
+    if (agentOnline) socket.emit('refreshPrinterList')
+  })
+  socket.on('disconnect', () => onStatus?.({ online: false, paired: true, message: '云端打印中转已断开' }))
+  socket.on('connect_error', (error) => onStatus?.({ online: false, paired: true, message: error?.message || '云端打印中转连接失败' }))
   socket.on('printerList', (printers) => {
     activePrinterName = resolvePrinterName(printers)
-    onStatus?.({ online: true, printers, printerName: activePrinterName })
+    const online = Array.isArray(printers) && printers.length > 0
+    onStatus?.({ online, paired: true, printers, printerName: activePrinterName, message: online ? '相机与打印已就绪' : '未检测到本机打印机' })
   })
-  socket.emit('refreshPrinterList')
   return socket
 }
 

@@ -29,13 +29,15 @@ Dockerfile             Zeabur 云端 Web 服务构建文件
 zeabur.yaml             Zeabur GitHub 自动部署模板
 ```
 
-## 云端与现场电脑的边界
+## 同一云端域名运行完整流程
 
 Zeabur 运行 Kiosk 网页、PHP API、ImageForge、MySQL 和 Redis。摄像头和打印机不能接入云服务器，必须物理连接现场电脑：
 
 - 摄像头由浏览器通过 `getUserMedia` 直接调用。
-- 打印机由现场电脑上的 `print-agent/` 调用系统打印驱动。
-- 现场正式运行建议打开本机 Kiosk 地址，以确保 `127.0.0.1:17521` 打印代理连接稳定；Zeabur 域名用于云端 API、远程访问和自动部署。
+- 打印机由现场电脑上的 `print-agent/` 调用系统打印驱动，并主动通过加密 WebSocket 连接 Zeabur 打印中转。
+- 用户始终只打开 `https://ai-zoo-zombie.zeabur.app/kiosk/`，不再启动或打开本地 Kiosk 网页，也不再由云端网页访问 `127.0.0.1`。
+- 每台新电脑第一次使用时，运行一次 `field-client/start-macos.command` 或 `field-client/start-windows.cmd`。脚本会生成独立随机终端码、自动绑定云端域名，并把打印代理设置为登录后自启。
+- 摄像头和打印机仍必须物理连接到正在打开网页的同一台电脑；浏览器授权摄像头，后台代理访问系统打印机。
 
 ## 本机启动
 
@@ -61,7 +63,7 @@ npm start
 
 打开 `http://127.0.0.1:4175`。浏览器需要相机权限，macOS/Windows 需要给 Electron 打印权限并安装对应打印机驱动。
 
-其他现场电脑可直接使用 [`field-client/`](field-client/) 内的 macOS 或 Windows 启动脚本。摄像头和打印机均会自动回退到该电脑的系统默认设备，不再依赖当前 Mac 的设备名。
+其他现场电脑可直接使用 [`field-client/`](field-client/) 内的 macOS 或 Windows 一次性安装脚本。安装结束后会自动打开云端域名，以后直接访问相同云端域名即可。摄像头和打印机均会自动回退到该电脑的系统默认设备，不依赖当前 Mac 的设备名。
 
 ## Zeabur 部署
 

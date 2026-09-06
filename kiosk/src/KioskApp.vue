@@ -73,6 +73,7 @@ const errorInfo = ref({
 const videoEl = ref(null);
 const cameraStream = ref(null);
 const printerOnline = ref(false);
+const printerStatusMessage = ref("正在连接打印服务");
 const deliveryPrinted = ref(false);
 const heroTitle = "AI ZOO".split("");
 let inactivityTimer;
@@ -592,6 +593,7 @@ watch(screen, (value) => {
 onMounted(async () => {
   connectPrintAgent((state) => {
     printerOnline.value = Boolean(state.online);
+    printerStatusMessage.value = state.message || (state.online ? "相机与打印已就绪" : "打印服务未连接");
   });
   try {
     await loadScenes();
@@ -641,7 +643,7 @@ onBeforeUnmount(() => {
         <span>真实四连拍</span><span>场景与姿势</span><span>智能美颜</span
         ><span>成品确认</span><span>现场打印</span
         ><span class="prisma-nav-status"
-          ><i></i>{{ printerOnline ? "相机与打印已就绪" : "相机就绪" }}</span
+          ><i></i>{{ printerOnline ? "相机与打印已就绪" : printerStatusMessage }}</span
         >
       </nav>
       <div class="prisma-content">
