@@ -4,9 +4,10 @@ import base64
 import io
 
 import httpx
+import pytest
 from PIL import Image
 
-from app.providers import GeminiGenerateContentProvider
+from app.providers import GeminiGenerateContentProvider, ProviderError, build_provider
 from app.security import generation_provider_scope
 
 
@@ -68,3 +69,23 @@ def test_gemini_provider_uses_native_multimodal_request(settings, monkeypatch):
     assert len(body["contents"][0]["parts"]) == 5
     assert body["generationConfig"]["responseModalities"] == ["IMAGE"]
     assert body["generationConfig"]["imageConfig"]["aspectRatio"] == "2:3"
+
+
+def test_build_provider_can_use_gemini_as_primary(settings):
+    settings.image_provider_override = "gemini"
+    settings.fallback_image_base_url = "https://relay.example"
+    settings.fallback_image_api_key = "test-key"
+
+    provider = build_provider(settings)
+
+    assert isinstance(provider, GeminiGenerateContentProvider)
+    assert provider.name == "gemini-image"
+
+
+def test_build_provider_rejects_unconfigured_gemini(settings):
+    settings.image_provider_override = "gemini"
+    settings.fallback_image_base_url = ""
+    settings.fallback_image_api_key = ""
+
+    with pytest.raises(ProviderError, match="Gemini 生图未配置"):
+        build_provider(settings)

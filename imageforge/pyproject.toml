@@ -1,7 +1,7 @@
 [project]
 name = "imageforge"
 version = "0.2.0"
-description = "AI 动物合照机：四张顾客原图 + 固定场景 Prompt 直连 GPT-image-2"
+description = "AI 动物合照机：四张顾客原图 + 固定场景 Prompt 直连 Gemini"
 requires-python = ">=3.11"
 dependencies = [
   "fastapi==0.116.1",

@@ -13,22 +13,14 @@ spec:
       type: DOMAIN
       name: Public domain
       description: Zeabur generated domain for the AI ZOO kiosk.
-    - key: NEWAPI_BASE_URL
-      type: STRING
-      name: Primary image API base URL
-      description: OpenAI-compatible image API endpoint.
-    - key: NEWAPI_TOKEN
-      type: STRING
-      name: Primary image API token
-      description: Token for GPT-image-2.
     - key: FALLBACK_IMAGE_BASE_URL
       type: STRING
-      name: Fallback image API base URL
-      description: Gemini-compatible fallback endpoint.
+      name: Gemini image API base URL
+      description: Gemini-compatible image generation endpoint.
     - key: FALLBACK_IMAGE_API_KEY
       type: STRING
-      name: Fallback image API key
-      description: Token for the fallback image provider.
+      name: Gemini image API key
+      description: Token for the Gemini image provider.
     - key: IMAGEFORGE_SECRET
       type: STRING
       name: ImageForge secret
@@ -248,6 +240,8 @@ spec:
             default: ${NEWAPI_TOKEN}
           GPT_IMAGE_MODEL:
             default: gpt-image-2
+          IMAGE_PROVIDER_OVERRIDE:
+            default: gemini
           FALLBACK_IMAGE_BASE_URL:
             default: ${FALLBACK_IMAGE_BASE_URL}
           FALLBACK_IMAGE_API_KEY:

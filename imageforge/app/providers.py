@@ -159,7 +159,7 @@ class GptImage2Provider(OpenAICompatibleProvider):
 
 
 class GeminiGenerateContentProvider(GuardedProvider):
-    name = "gemini-image-fallback"
+    name = "gemini-image"
 
     def __init__(self, settings: Settings):
         self.settings = settings
@@ -306,6 +306,10 @@ def build_provider(settings: Settings) -> ImageProvider:
         return MockProvider()
     if override in {"qwen", "qwen-image"}:
         return QwenProvider(settings)
+    if override in {"gemini", "gemini-image"}:
+        if not settings.fallback_provider_configured:
+            raise ProviderError("Gemini 生图未配置 FALLBACK_IMAGE_BASE_URL/FALLBACK_IMAGE_API_KEY")
+        return GeminiGenerateContentProvider(settings)
     primary = GptImage2Provider(settings)
     if settings.fallback_provider_configured:
         return FallbackProvider(primary, GeminiGenerateContentProvider(settings))

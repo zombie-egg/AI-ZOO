@@ -162,19 +162,25 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.get("/healthz")
     def healthz() -> dict[str, Any]:
         usage = shutil.disk_usage(current.private_dir)
+        active_provider = build_provider(current)
         return {
             "ok": usage.free > 256 * 1024 * 1024,
             "database": "ok",
             "queue_depth": service.db.queue_depth(),
             "disk_free_mb": round(usage.free / 1024 / 1024),
-            "pipeline": "gpt-image-2-direct-multi-reference",
+            "pipeline": f"{active_provider.name}-direct-multi-reference",
             "reference_count": "4 per participant",
             "max_participants": 4,
             "templates_enabled": False,
             "free_preview_enabled": False,
             "face_engine": service.face_engine.name,
             "face_engine_production_ready": service.face_engine.production_ready,
-            "provider_configured": bool(current.provider_token),
+            "provider_configured": (
+                current.fallback_provider_configured
+                if active_provider.name == "gemini-image"
+                else bool(current.provider_token)
+            ),
+            "active_provider": active_provider.name,
             "fallback_provider_configured": current.fallback_provider_configured,
             "fallback_provider_model": (
                 current.fallback_image_model if current.fallback_provider_configured else None
