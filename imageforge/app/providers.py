@@ -155,7 +155,7 @@ class OpenAICompatibleProvider(GuardedProvider):
 
 class GptImage2Provider(OpenAICompatibleProvider):
     def __init__(self, settings: Settings):
-        super().__init__(settings, settings.gpt_image_model, "gpt-image-2")
+        super().__init__(settings, settings.gpt_image_model.strip(), "gpt-image-2")
 
 
 class GeminiGenerateContentProvider(GuardedProvider):
@@ -163,7 +163,7 @@ class GeminiGenerateContentProvider(GuardedProvider):
 
     def __init__(self, settings: Settings):
         self.settings = settings
-        self.model = settings.fallback_image_model
+        self.model = settings.fallback_image_model.strip()
 
     @staticmethod
     def _mime_type(image_bytes: bytes) -> str:
@@ -229,7 +229,7 @@ class GeminiGenerateContentProvider(GuardedProvider):
     def _generate(
         self, prompt: str, init_image: bytes | None, size: str, reference_images: list[bytes]
     ) -> bytes:
-        token = self.settings.fallback_image_api_key
+        token = self.settings.fallback_image_api_key.strip()
         if not token:
             raise ProviderError("未配置 FALLBACK_IMAGE_API_KEY")
         images = ([init_image] if init_image is not None else []) + reference_images
@@ -243,7 +243,7 @@ class GeminiGenerateContentProvider(GuardedProvider):
             }
             for image_bytes in images
         )
-        base = self.settings.fallback_image_base_url.rstrip("/")
+        base = self.settings.fallback_image_base_url.strip().rstrip("/")
         if base.endswith("/v1beta"):
             endpoint = f"{base}/models/{self.model}:generateContent"
         else:

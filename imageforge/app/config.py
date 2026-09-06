@@ -61,15 +61,15 @@ class Settings(BaseSettings):
     @property
     def provider_token(self) -> str:
         # 兼容用户已保存的 GPT_IMAGE_API_KEY，也兼容规范里的 NEWAPI_TOKEN。
-        return self.newapi_token or self.gpt_image_api_key
+        return (self.newapi_token or self.gpt_image_api_key).strip()
 
     @property
     def provider_base_url(self) -> str:
-        return self.gpt_image_base_url or self.newapi_base_url
+        return (self.gpt_image_base_url or self.newapi_base_url).strip()
 
     @property
     def fallback_provider_configured(self) -> bool:
-        return bool(self.fallback_image_base_url and self.fallback_image_api_key)
+        return bool(self.fallback_image_base_url.strip() and self.fallback_image_api_key.strip())
 
     @property
     def cors_allowed_origin_list(self) -> list[str]:
