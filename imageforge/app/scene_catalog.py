@@ -90,11 +90,12 @@ suggestions, and must remain natural in a high-resolution printed photograph:
 - EYE-AREA RETOUCHING: noticeably reduce dark circles, mild under-eye bags, and tired shadows while
   preserving the natural lower-eyelid structure. Make the eyes look slightly clearer and more awake,
   but do not enlarge the eyes or change their shape or spacing.
-- FINISH: gently soften harsh facial shadows, balance facial exposure, and keep lips and teeth clean
-  and natural without heavy makeup or artificial recoloring.
+- FINISH: gently soften harsh facial shadows, balance facial exposure, and keep the lips natural
+  without heavy makeup or artificial recoloring.
 
-FACIAL EXPRESSION: Preserve each visitor's own natural, relaxed, candid expression; do not force,
-standardize, exaggerate, or copy the same smile across people.
+FACIAL EXPRESSION: Preserve each visitor's own natural, relaxed, neutral, candid expression. Do not
+ask for or add a smile. Keep the lips comfortably and naturally closed with no visible teeth, but do
+not press or tighten the mouth. Do not force, standardize, exaggerate, or copy expressions across people.
 Do not use face averaging or change age, ethnicity, gender, hairstyle, or distinctive facial details.
 Preserve normal facial asymmetry, the exact outfit from reference image 1, and glasses if present.
 Glasses must have physically plausible reflections that do not hide both eyes.
@@ -394,7 +395,7 @@ def compose_generation_prompt(scene: ScenePrompt, pose: PosePrompt, participant_
 
 
 def composed_prompt_version(scene: ScenePrompt, pose: PosePrompt, participant_count: int = 1) -> str:
-    return f"{scene.prompt_version}+{pose.prompt_version}+group-{participant_count}-v1+natural-expression-v1"
+    return f"{scene.prompt_version}+{pose.prompt_version}+group-{participant_count}-v1+natural-expression-v2"
 
 
 def composed_prompt_hash(scene: ScenePrompt, pose: PosePrompt, participant_count: int = 1) -> str:
