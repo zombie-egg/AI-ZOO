@@ -31,7 +31,7 @@ printf '%s\n' '#!/bin/zsh' \
   "cd ${(q)PROJECT_DIR}/print-agent" \
   "export AI_ZOO_PRINT_RELAY_URL=${(q)CLOUD_URL}" \
   "export AI_ZOO_TERMINAL_ID=${(q)TERMINAL_ID}" \
-  "export PATH=${(q)NODE_BIN_DIR}:/usr/local/bin:/usr/bin:/bin" \
+  "export PATH=${(q)NODE_BIN_DIR}:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin" \
   'exec npm start' > "$RUNNER_FILE"
 chmod 0700 "$RUNNER_FILE"
 
