@@ -68,6 +68,7 @@ INTERNAL_TOKEN = ${IMAGEFORGE_INTERNAL_TOKEN}
 DEVICE_PROXY_TOKEN = ${KIOSK_DEVICE_PROXY_TOKEN}
 PHOTO_TTL_DAYS = 7
 OPERATOR_TEST_MODE = false
+PAYMENT_MODE = ${KIOSK_PAYMENT_MODE:-mock}
 EOF
 chmod 0600 /var/www/html/.env
 chown www-data:www-data /var/www/html/.env

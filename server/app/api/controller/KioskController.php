@@ -7,7 +7,7 @@ use app\api\logic\KioskLogic;
 class KioskController extends BaseApiController
 {
     public array $notNeedLogin = [
-        'scenes', 'createOrder', 'selectScene', 'selectPose', 'photos', 'status', 'pay',
+        'scenes', 'createOrder', 'selectScene', 'selectPose', 'photos', 'status', 'pay', 'simulatePay',
         'generate', 'generationStatus', 'approveResult', 'printStatus', 'deleteData'
     ];
 
@@ -69,6 +69,12 @@ class KioskController extends BaseApiController
     {
         try { return $this->data(KioskLogic::createPayment($id, (string)$this->request->post('sku', 'print_1'))); }
         catch (\Throwable $e) { return $this->fail('K1004：' . $e->getMessage()); }
+    }
+
+    public function simulatePay(int $id)
+    {
+        try { return $this->data(KioskLogic::simulatePayment($id)); }
+        catch (\Throwable $e) { return $this->fail('K1011：' . $e->getMessage()); }
     }
 
     public function generate(int $id)

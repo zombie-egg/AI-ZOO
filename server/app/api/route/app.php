@@ -10,6 +10,7 @@ Route::group('kiosk', function () {
     Route::post('order-photos/<id>', 'Kiosk/photos');
     Route::get('order-status/<id>', 'Kiosk/status');
     Route::post('order-pay/<id>', 'Kiosk/pay');
+    Route::post('order-pay/<id>/simulate', 'Kiosk/simulatePay');
     Route::post('order-generate/<id>', 'Kiosk/generate');
     Route::get('order-generation-status/<id>', 'Kiosk/generationStatus');
     Route::post('order-approve/<id>', 'Kiosk/approveResult');

@@ -42,6 +42,7 @@ const stages = [
 ];
 const screen = ref("idle");
 const busy = ref(false);
+const paymentBusy = ref(false);
 const message = ref("");
 const countdown = ref(0);
 const progress = ref(0);
@@ -59,6 +60,8 @@ const finalUrl = ref("");
 const printPayloadUrl = ref("");
 const qr = ref("");
 const downloadQr = ref("");
+const paymentMode = ref("");
+const paymentAmount = ref(kioskConfig.price);
 const consent = ref(false);
 const minor = ref(false);
 const guardianConfirmed = ref(false);
@@ -144,6 +147,7 @@ function go(next) {
   clearFlowTimer();
   screen.value = next;
   message.value = "";
+  paymentBusy.value = false;
   progress.value = 0;
   resetInactivity();
 }
@@ -172,6 +176,8 @@ function resetAll() {
   printPayloadUrl.value = "";
   qr.value = "";
   downloadQr.value = "";
+  paymentMode.value = "";
+  paymentAmount.value = kioskConfig.price;
   consent.value = false;
   minor.value = false;
   guardianConfirmed.value = false;
@@ -402,9 +408,14 @@ async function confirmParticipantPhotos() {
 
 async function proceedToPayment() {
   go("pay");
-  if (kioskConfig.localOperatorMode) return;
   try {
     const payment = await kioskApi.createPayment(order.value.id);
+    paymentMode.value = payment.payment_mode || "wechat_native";
+    paymentAmount.value = Number(payment.amount ?? kioskConfig.price);
+    if (payment.paid) {
+      await beginGeneration(false);
+      return;
+    }
     qr.value = await QRCode.toDataURL(payment.code_url, {
       width: 330,
       margin: 1,
@@ -412,6 +423,20 @@ async function proceedToPayment() {
     pollPayment();
   } catch (error) {
     fail("支付二维码生成失败", error.message, true, "group_review");
+  }
+}
+
+async function simulateWechatPayment() {
+  if (paymentBusy.value || paymentMode.value !== "mock") return;
+  paymentBusy.value = true;
+  message.value = "正在模拟接收微信支付成功通知…";
+  try {
+    await kioskApi.simulatePayment(order.value.id);
+    message.value = "已收到模拟支付成功通知，正在确认订单状态…";
+  } catch (error) {
+    message.value = `模拟支付失败：${error.message}`;
+  } finally {
+    paymentBusy.value = false;
   }
 }
 
@@ -890,17 +915,18 @@ onBeforeUnmount(() => {
         ← 返回全员确认
       </button>
       <p class="scene-kicker">
-        {{ participantCount }} 人合照 ·
-        {{ kioskConfig.localOperatorMode ? "真实接口测试" : "付款后生成" }}
+        {{ participantCount }} 人合照 · 付款成功后生成
       </p>
-      <h2 v-if="kioskConfig.localOperatorMode">准备生成多人合照</h2>
-      <h2 v-else>微信扫码支付 ¥{{ kioskConfig.price }}</h2>
+      <h2>微信扫码支付 ¥{{ paymentAmount.toFixed(2) }}</h2>
       <img
-        v-if="!kioskConfig.localOperatorMode"
+        v-if="qr"
         class="qr-image"
         :src="qr"
         alt="微信支付二维码"
       />
+      <p v-if="paymentMode === 'mock'" class="payment-mode-note">
+        当前未接入微信商户号，上方为流程测试二维码。
+      </p>
       <p class="subcopy">
         将按人物分组发送
         {{ participantCount * 4 }} 张原图，严格区分每个人的身份与服装，并使用“{{
@@ -909,19 +935,19 @@ onBeforeUnmount(() => {
         · {{ selectedPose?.title }}”构图及逐人美颜。
       </p>
       <button
-        v-if="kioskConfig.localOperatorMode"
+        v-if="paymentMode === 'mock'"
         class="primary-action small"
-        :disabled="busy"
-        @click="beginGeneration(true)"
+        :disabled="paymentBusy"
+        @click="simulateWechatPayment"
       >
-        确认真实发送并生图（会计费）
+        {{ paymentBusy ? "正在确认…" : "模拟完成微信支付" }}
       </button>
       <p class="status-note">
         {{
           message ||
-          (kioskConfig.localOperatorMode
-            ? "点击后立即产生真实 API 调用。"
-            : "正在安全轮询支付状态…")
+          (paymentMode === "mock"
+            ? "点击模拟支付后，系统仍会等待后端确认 paid 状态。"
+            : "正在安全轮询微信支付状态…")
         }}
       </p>
     </section>
@@ -998,8 +1024,8 @@ onBeforeUnmount(() => {
         </button>
       </div>
       <div class="download-card">
-        <img :src="downloadQr" alt="电子版下载二维码" /><b>扫码保存高清电子版</b
-        ><span>链接 24 小时内有效</span>
+        <img :src="downloadQr" alt="高清照片直接下载二维码" /><b>扫码直接下载高清照片</b
+        ><span>这是取片码，不是支付码 · 链接 24 小时内有效</span>
       </div>
     </section>
 

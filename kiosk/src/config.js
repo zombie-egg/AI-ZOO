@@ -7,6 +7,6 @@ export const kioskConfig = Object.freeze({
   printAgentToken: env.VITE_PRINT_AGENT_TOKEN ?? '',
   printerName: env.VITE_PHOTO_PRINTER_NAME ?? 'Canon SELPHY CP1500',
   cameraLabel: env.VITE_CAMERA_DEVICE_LABEL ?? '1200W Camera',
-  price: 19.9,
+  price: 9.9,
   inactivityMs: Number(env.VITE_INACTIVITY_MS ?? 5 * 60 * 1000),
 })

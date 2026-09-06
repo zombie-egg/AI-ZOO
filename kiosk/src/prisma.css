@@ -333,6 +333,12 @@ button, a { letter-spacing: .065em; }
 .kiosk-shell:not([data-screen="idle"]) .printer-illustration { background: rgba(255,255,252,.72); box-shadow: inset 0 0 0 1px rgba(31,38,37,.09), 0 24px 70px rgba(46,52,48,.08); }
 .kiosk-shell:not([data-screen="idle"]) .success-mark { border-color: #557c4d; color: #557c4d; }
 .kiosk-shell:not([data-screen="idle"]) .footer-line { color: rgba(31,38,37,.46); }
+.payment-mode-note {
+  margin: 14px 0 0;
+  color: rgba(0,0,0,.58);
+  font-size: 14px;
+  letter-spacing: .08em;
+}
 
 /* Final monochrome tea-brand direction: pure white paper, black type, fine geometry. */
 .kiosk-shell:not([data-screen="idle"]) {

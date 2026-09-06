@@ -6,6 +6,7 @@ use app\common\enum\PayEnum;
 use app\common\enum\user\UserTerminalEnum;
 use app\common\logic\BaseLogic;
 use app\common\logic\PaymentLogic;
+use app\common\logic\PayNotifyLogic;
 use app\common\model\kiosk\KioskOrder;
 use app\common\model\kiosk\KioskParticipant;
 use app\common\model\kiosk\KioskPhoto;
@@ -278,7 +279,7 @@ class KioskLogic extends BaseLogic
         if (!$order->scene_id || !$order->pose_id || $order->status !== 'captured') {
             throw new \RuntimeException('请先选择场景和姿势，并完成每位参与者的四连拍');
         }
-        $catalog = ['print_1' => 19.90, 'digital_only' => 9.90];
+        $catalog = ['print_1' => 9.90, 'digital_only' => 9.90];
         if (!isset($catalog[$sku])) {
             throw new \RuntimeException('所选商品不存在');
         }
@@ -296,7 +297,23 @@ class KioskLogic extends BaseLogic
             ]);
         }
         if ((int)$unlock->pay_status === PayEnum::ISPAID) {
-            return ['paid' => true, 'unlock_order_id' => $unlock->id];
+            return [
+                'paid' => true,
+                'unlock_order_id' => $unlock->id,
+                'amount' => $catalog[$sku],
+                'currency' => 'CNY',
+                'payment_mode' => self::paymentMode(),
+            ];
+        }
+        if (self::paymentMode() === 'mock') {
+            return [
+                'paid' => false,
+                'unlock_order_id' => $unlock->id,
+                'code_url' => 'AI-ZOO-WECHAT-PAY-MOCK:' . $unlock->sn . ':CNY:9.90',
+                'amount' => $catalog[$sku],
+                'currency' => 'CNY',
+                'payment_mode' => 'mock',
+            ];
         }
         $payment = PaymentLogic::pay(PayEnum::WECHAT_PAY, 'unlock', $unlock->toArray(), UserTerminalEnum::PC, '');
         if ($payment === false) {
@@ -306,6 +323,32 @@ class KioskLogic extends BaseLogic
             'unlock_order_id' => $unlock->id,
             'code_url' => $payment['config'] ?? '',
             'amount' => $catalog[$sku],
+            'currency' => 'CNY',
+            'payment_mode' => 'wechat_native',
+        ];
+    }
+
+    public static function simulatePayment(int $id): array
+    {
+        if (self::paymentMode() !== 'mock') {
+            throw new \RuntimeException('正式微信支付模式不允许模拟到账');
+        }
+        self::order($id);
+        $unlock = UnlockOrder::where('kiosk_order_id', $id)->order('id desc')->findOrEmpty();
+        if ($unlock->isEmpty()) {
+            throw new \RuntimeException('请先创建微信支付订单');
+        }
+        $result = PayNotifyLogic::handle('unlock', (string)$unlock->sn, [
+            'transaction_id' => 'MOCK-' . date('YmdHis') . '-' . $unlock->id,
+        ]);
+        if ($result !== true) {
+            throw new \RuntimeException((string)$result);
+        }
+        return [
+            'paid' => true,
+            'unlock_order_id' => $unlock->id,
+            'unlock_status' => 'paid',
+            'payment_mode' => 'mock',
         ];
     }
 
@@ -487,6 +530,17 @@ class KioskLogic extends BaseLogic
             throw new \RuntimeException('Kiosk 订单不存在');
         }
         return $order;
+    }
+
+    private static function paymentMode(): string
+    {
+        $runtimeMode = getenv('KIOSK_PAYMENT_MODE');
+        $mode = strtolower(trim((string)(
+            $runtimeMode !== false ? $runtimeMode : env('kiosk.payment_mode', 'mock')
+        )));
+        return in_array($mode, ['wechat', 'wechat_native', 'production'], true)
+            ? 'wechat_native'
+            : 'mock';
     }
 
     private static function participant(int $orderId, int $slotNo): KioskParticipant

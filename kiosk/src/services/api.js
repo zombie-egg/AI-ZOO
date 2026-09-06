@@ -48,6 +48,9 @@ export const kioskApi = {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sku }),
     })
   },
+  simulatePayment(orderId) {
+    return request(`/api/kiosk/order-pay/${orderId}/simulate`, { method: 'POST' })
+  },
   startGeneration(orderId, operatorTest = false, sku = 'print_1') {
     return request(`/api/kiosk/order-generate/${orderId}`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ operator_test: operatorTest, sku }),
