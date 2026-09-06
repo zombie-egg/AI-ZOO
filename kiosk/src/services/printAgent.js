@@ -67,18 +67,18 @@ export function connectPrintAgent(onStatus) {
   return socket
 }
 
-export function printPhoto({ html, orderNo, copies = 1 }) {
+export function printPhoto({ html, htmlUrl, orderNo, copies = 1 }) {
   if (!socket?.connected) throw new Error('打印代理未连接')
   return new Promise((resolve, reject) => {
     const matches = (payload) => !payload?.templateId || String(payload.templateId) === String(orderNo)
     const cleanup = () => { socket.off('success', success); socket.off('error', failure); clearTimeout(timeout) }
     const success = (payload) => { if (matches(payload)) { cleanup(); resolve(payload) } }
     const failure = (payload) => { if (matches(payload)) { cleanup(); reject(new Error(payload?.message || payload?.msg || '打印失败')) } }
-    const timeout = setTimeout(() => { cleanup(); reject(new Error('90 秒内未收到打印完成回调')) }, 90000)
+    const timeout = setTimeout(() => { cleanup(); reject(new Error('240 秒内未收到打印完成回调')) }, 240000)
     socket.on('success', success)
     socket.on('error', failure)
     socket.emit('news', {
-      html, templateId: orderNo, printer: activePrinterName,
+      html, htmlUrl, templateId: orderNo, printer: activePrinterName,
       // 当前现场使用 CP1500 KL 系列 L 尺寸相纸（89×119 mm）。
       // 保留环境变量覆盖，以便换成 KP 明信片纸时改为 100×148，而无需改代码。
       pageSize: {

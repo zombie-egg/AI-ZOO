@@ -2,6 +2,7 @@ const os = require("os");
 const path = require("path");
 const fs = require("fs");
 const childProcess = require("child_process");
+const https = require("https");
 const { app, Notification, dialog, clipboard, shell } = require("electron");
 const address = require("address");
 const ipp = require("ipp");
@@ -689,6 +690,72 @@ function initServeEvent(server) {
   });
 }
 
+const MAX_CLOUD_PRINT_HTML_BYTES = 16 * 1024 * 1024;
+
+function downloadCloudPrintHtml(rawUrl, redirects = 0) {
+  return new Promise((resolve, reject) => {
+    let url;
+    let relayUrl;
+    try {
+      url = new URL(rawUrl);
+      relayUrl = new URL(process.env.AI_ZOO_PRINT_RELAY_URL || "");
+    } catch {
+      reject(new Error("打印排版地址格式无效"));
+      return;
+    }
+    if (
+      url.protocol !== "https:" ||
+      url.hostname !== relayUrl.hostname ||
+      !url.pathname.startsWith("/private-delivery/") ||
+      !url.pathname.endsWith("/print_payload.html")
+    ) {
+      reject(new Error("打印排版地址不受信任"));
+      return;
+    }
+
+    const request = https.get(
+      url,
+      { headers: { "User-Agent": "AI-ZOO-Print-Agent/1.0" } },
+      (response) => {
+        if (
+          response.statusCode >= 300 &&
+          response.statusCode < 400 &&
+          response.headers.location
+        ) {
+          response.resume();
+          if (redirects >= 3) {
+            reject(new Error("打印排版下载重定向次数过多"));
+            return;
+          }
+          const nextUrl = new URL(response.headers.location, url).toString();
+          downloadCloudPrintHtml(nextUrl, redirects + 1).then(resolve, reject);
+          return;
+        }
+        if (response.statusCode !== 200) {
+          response.resume();
+          reject(new Error(`云端返回 HTTP ${response.statusCode}`));
+          return;
+        }
+
+        const chunks = [];
+        let received = 0;
+        response.on("data", (chunk) => {
+          received += chunk.length;
+          if (received > MAX_CLOUD_PRINT_HTML_BYTES) {
+            response.destroy(new Error("打印排版文件过大"));
+            return;
+          }
+          chunks.push(chunk);
+        });
+        response.on("end", () => resolve(Buffer.concat(chunks).toString("utf8")));
+        response.on("error", reject);
+      },
+    );
+    request.setTimeout(180000, () => request.destroy(new Error("打印排版下载超时")));
+    request.on("error", reject);
+  });
+}
+
 /**
  * @description: 作为客户端连接中转服务时绑定的 socket 事件
  * @return {void}
@@ -820,8 +887,17 @@ function initClientEvent() {
   /**
    * @description: 中转服务 常规打印任务
    */
-  client.on("news", (data) => {
+  client.on("news", async (data) => {
     if (data) {
+      try {
+        if (!data.html && data.htmlUrl) {
+          console.log(`中转服务 ${client.id}: 下载云端打印排版`);
+          data.html = await downloadCloudPrintHtml(data.htmlUrl);
+          delete data.htmlUrl;
+        }
+        if (!data.html) {
+          throw new Error("打印排版内容为空");
+        }
       PRINT_RUNNER.add((done) => {
         data.socketId = client.id;
         data.taskId = uuidv7();
@@ -830,6 +906,13 @@ function initClientEvent() {
         MAIN_WINDOW.webContents.send("printTask", true);
         PRINT_RUNNER_DONE[data.taskId] = done;
       });
+      } catch (error) {
+        console.error(`中转服务 ${client.id}: 下载打印排版失败: ${error.message}`);
+        client.emit("error", {
+          templateId: data.templateId,
+          message: `打印排版下载失败：${error.message}`,
+        });
+      }
     }
   });
 

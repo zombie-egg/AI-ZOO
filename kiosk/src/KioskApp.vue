@@ -535,20 +535,18 @@ async function beginPrinting() {
     return;
   }
   go("printing");
-  secondsLeft.value = 90;
+  secondsLeft.value = 240;
   try {
     await kioskApi.reportPrintStatus(order.value.id, "printing");
     flowTimer = window.setInterval(() => {
       progress.value = Math.min(92, progress.value + 2);
       secondsLeft.value = Math.max(1, secondsLeft.value - 1);
     }, 1000);
-    const html = await fetch(printPayloadUrl.value, {
-      credentials: "include",
-    }).then((response) => {
-      if (!response.ok) throw new Error("打印排版下载失败");
-      return response.text();
+    await printPhoto({
+      htmlUrl: printPayloadUrl.value,
+      orderNo: order.value.order_no,
+      copies: 1,
     });
-    await printPhoto({ html, orderNo: order.value.order_no, copies: 1 });
     clearFlowTimer();
     progress.value = 100;
     deliveryPrinted.value = true;

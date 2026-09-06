@@ -1,14 +1,32 @@
 from __future__ import annotations
 
 import re
+import os
 from collections import defaultdict
 from typing import Any
+from urllib.parse import urlparse
 
 import socketio
 
 
 TERMINAL_ID_RE = re.compile(r"^[A-Za-z0-9_-]{32,128}$")
 MAX_HTML_CHARS = 15 * 1024 * 1024
+PUBLIC_HOST = urlparse(
+    os.getenv("PUBLIC_BASE_URL", "https://ai-zoo-zombie.zeabur.app")
+).hostname
+
+
+def _valid_print_url(value: Any) -> bool:
+    if not isinstance(value, str) or len(value) > 4096:
+        return False
+    parsed = urlparse(value)
+    return (
+        parsed.scheme == "https"
+        and parsed.hostname == PUBLIC_HOST
+        and parsed.path.startswith("/private-delivery/")
+        and parsed.path.endswith("/print_payload.html")
+        and bool(parsed.query)
+    )
 
 sio = socketio.AsyncServer(
     async_mode="asgi",
@@ -123,8 +141,10 @@ async def print_job(sid: str, payload: Any) -> None:
         await sio.emit("error", {"message": "打印任务格式无效"}, to=sid)
         return
     html = payload.get("html")
-    if not isinstance(html, str) or not html or len(html) > MAX_HTML_CHARS:
-        await sio.emit("error", {"message": "打印内容为空或过大"}, to=sid)
+    html_url = payload.get("htmlUrl")
+    has_inline_html = isinstance(html, str) and bool(html) and len(html) <= MAX_HTML_CHARS
+    if not has_inline_html and not _valid_print_url(html_url):
+        await sio.emit("error", {"message": "打印内容或签名下载地址无效"}, to=sid)
         return
 
     safe_payload = dict(payload)
