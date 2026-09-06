@@ -37,7 +37,9 @@ RUN apt-get update \
     && docker-php-ext-enable redis \
     && rm -rf /var/lib/apt/lists/*
 
-COPY --from=docker.1ms.run/library/composer:2 /usr/bin/composer /usr/local/bin/composer
+# 1ms 的 Composer 镜像曾返回已丢失的 OCI layer，导致 Zeabur 无法重建。
+# Ashburn 构建节点直接读取官方镜像更稳定；其余较大的基础镜像仍保留加速源。
+COPY --from=composer:2 /usr/bin/composer /usr/local/bin/composer
 
 WORKDIR /var/www/html
 COPY server/composer.json server/composer.lock ./
