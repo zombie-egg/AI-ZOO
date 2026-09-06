@@ -14,6 +14,7 @@ if ! command -v node >/dev/null 2>&1; then
   read -k 1
   exit 1
 fi
+NODE_BIN_DIR="$(dirname "$(command -v node)")"
 
 mkdir -p "$CONFIG_DIR" "${HOME}/Library/LaunchAgents"
 if [ ! -s "$TERMINAL_FILE" ]; then
@@ -30,6 +31,7 @@ printf '%s\n' '#!/bin/zsh' \
   "cd ${(q)PROJECT_DIR}/print-agent" \
   "export AI_ZOO_PRINT_RELAY_URL=${(q)CLOUD_URL}" \
   "export AI_ZOO_TERMINAL_ID=${(q)TERMINAL_ID}" \
+  "export PATH=${(q)NODE_BIN_DIR}:/usr/local/bin:/usr/bin:/bin" \
   'exec npm start' > "$RUNNER_FILE"
 chmod 0700 "$RUNNER_FILE"
 
