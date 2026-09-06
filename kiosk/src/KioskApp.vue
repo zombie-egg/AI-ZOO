@@ -924,6 +924,13 @@ onBeforeUnmount(() => {
         :src="qr"
         alt="微信支付二维码"
       />
+      <button
+        class="primary-action small mock-payment-action"
+        :disabled="paymentBusy || !paymentMode"
+        @click="simulateWechatPayment"
+      >
+        {{ paymentBusy ? "正在确认…" : "模拟完成微信支付" }}
+      </button>
       <p v-if="paymentMode === 'mock'" class="payment-mode-note">
         当前未接入微信商户号，上方为流程测试二维码。
       </p>
@@ -934,14 +941,6 @@ onBeforeUnmount(() => {
         }}
         · {{ selectedPose?.title }}”构图及逐人美颜。
       </p>
-      <button
-        v-if="paymentMode === 'mock'"
-        class="primary-action small"
-        :disabled="paymentBusy"
-        @click="simulateWechatPayment"
-      >
-        {{ paymentBusy ? "正在确认…" : "模拟完成微信支付" }}
-      </button>
       <p class="status-note">
         {{
           message ||

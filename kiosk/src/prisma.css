@@ -334,10 +334,14 @@ button, a { letter-spacing: .065em; }
 .kiosk-shell:not([data-screen="idle"]) .success-mark { border-color: #557c4d; color: #557c4d; }
 .kiosk-shell:not([data-screen="idle"]) .footer-line { color: rgba(31,38,37,.46); }
 .payment-mode-note {
-  margin: 14px 0 0;
+  margin: 6px 0 0;
   color: rgba(0,0,0,.58);
   font-size: 14px;
   letter-spacing: .08em;
+}
+.mock-payment-action.primary-action.small {
+  min-width: 360px;
+  margin: 18px auto 8px;
 }
 
 /* Final monochrome tea-brand direction: pure white paper, black type, fine geometry. */
