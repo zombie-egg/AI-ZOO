@@ -5,6 +5,7 @@ const path = require("path");
 const os = require("os");
 const fs = require("fs");
 const { printPdf, printPdfBlob } = require("./pdf-print");
+const { printSelphyDirect } = require("./selphy-direct");
 const { store, getCurrentPrintStatusByName } = require("../tools/utils");
 const db = require("../tools/database");
 const dayjs = require("dayjs");
@@ -332,7 +333,41 @@ function initPrintEvent() {
         });
       return;
     }
-    // 打印 详见https://www.electronjs.org/zh/docs/latest/api/web-contents
+    // macOS 的通用 CUPS 队列会在 CP1500 实际拒绝任务时提前回调成功。
+    // 对现场 SELPHY 的内嵌 JPEG 直接走 USB IPP，并等待设备端最终状态，避免“假成功”。
+    if (
+      process.platform === "darwin" &&
+      /can(on)?[_ ]?selphy[_ ]?cp1500/i.test(deviceName) &&
+      /data:image\/jpeg;base64,/i.test(data.html || "")
+    ) {
+      try {
+        const result = await printSelphyDirect(data.html, data.templateId);
+        console.log(
+          `插件端 ${socket?.id} 模板 【${data.templateId}】 CP1500 直连打印成功，任务：${result.jobId}，纸张：${result.media}`,
+        );
+        const payload = { msg: "打印成功", templateId: data.templateId, replyId: data.replyId };
+        socket?.emit("successs", payload);
+        socket?.emit("success", payload);
+        logPrintResult("success");
+      } catch (error) {
+        console.log(`插件端 ${socket?.id} 模板 【${data.templateId}】 CP1500 直连打印失败：${error.message}`);
+        socket?.emit("error", {
+          msg: "打印失败: " + error.message,
+          templateId: data.templateId,
+          replyId: data.replyId,
+        });
+        logPrintResult("failed", error.message);
+      } finally {
+        if (data.taskId) {
+          PRINT_RUNNER_DONE[data.taskId]();
+          delete PRINT_RUNNER_DONE[data.taskId];
+        }
+        MAIN_WINDOW.webContents.send("printTask", PRINT_RUNNER.isBusy());
+      }
+      return;
+    }
+
+    // 其他打印机继续使用 Electron 系统打印。
     PRINT_WINDOW.webContents.print(
       {
         silent: data.silent ?? true, // 静默打印
