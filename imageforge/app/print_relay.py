@@ -18,7 +18,9 @@ PUBLIC_HOST = urlparse(
     os.getenv("PUBLIC_BASE_URL", "https://ai-zoo-zombie.zeabur.app")
 ).hostname
 PRIVATE_ROOT = Path(os.getenv("PRIVATE_DIR", "/data/imageforge/private"))
-PRINT_FRAGMENT_CHARS = 96 * 1024
+PRINT_FRAGMENT_CHARS = 48 * 1024
+PRINT_FRAGMENT_ACK_TIMEOUT_SECONDS = 30
+PRINT_FRAGMENT_RETRIES = 6
 
 
 def _valid_print_url(value: Any) -> bool:
@@ -128,6 +130,34 @@ def _terminal_for_agent(sid: str) -> str | None:
     return identity[1]
 
 
+async def _send_print_fragment_with_ack(
+    terminal_id: str,
+    fragment_payload: dict[str, Any],
+) -> None:
+    last_error: Exception | None = None
+    for attempt in range(PRINT_FRAGMENT_RETRIES):
+        agent_sid = agents.get(terminal_id)
+        if not agent_sid:
+            last_error = RuntimeError("本机打印服务已离线")
+            await asyncio.sleep(min(2 + attempt, 5))
+            continue
+        try:
+            response = await sio.call(
+                "printByFragments",
+                fragment_payload,
+                to=agent_sid,
+                timeout=PRINT_FRAGMENT_ACK_TIMEOUT_SECONDS,
+            )
+            if isinstance(response, dict) and response.get("ok") is True:
+                return
+            message = response.get("message") if isinstance(response, dict) else None
+            last_error = RuntimeError(message or "本机打印服务未确认排版分片")
+        except Exception as error:
+            last_error = error
+        await asyncio.sleep(min(1 + attempt, 5))
+    raise RuntimeError(f"打印排版传输失败：{last_error or '本机打印服务无响应'}")
+
+
 @sio.on("refreshPrinterList")
 async def refresh_printer_list(sid: str) -> None:
     agent_sid = _agent_for_kiosk(sid)
@@ -194,17 +224,27 @@ async def print_job(sid: str, payload: Any) -> None:
         print_html[index : index + PRINT_FRAGMENT_CHARS]
         for index in range(0, len(print_html), PRINT_FRAGMENT_CHARS)
     ]
-    for index, fragment in enumerate(fragments):
+    identity = connections.get(sid)
+    terminal_id = identity[1] if identity and identity[0] == "kiosk" else None
+    if not terminal_id:
+        return
+    try:
+        for index, fragment in enumerate(fragments):
+            await _send_print_fragment_with_ack(
+                terminal_id,
+                {
+                    **safe_payload,
+                    "id": fragment_id,
+                    "total": len(fragments),
+                    "index": index,
+                    "htmlFragment": fragment,
+                },
+            )
+    except RuntimeError as error:
         await sio.emit(
-            "printByFragments",
-            {
-                **safe_payload,
-                "id": fragment_id,
-                "total": len(fragments),
-                "index": index,
-                "htmlFragment": fragment,
-            },
-            to=agent_sid,
+            "error",
+            {"templateId": payload.get("templateId"), "message": str(error)},
+            to=sid,
         )
 
 

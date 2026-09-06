@@ -225,6 +225,15 @@ const _address = {
 const watchTaskInstance = generateWatchTask(
   () => global.PRINT_FRAGMENTS_MAPPING,
 )();
+const completedTransitFragmentIds = new Map();
+
+function rememberCompletedTransitFragment(id) {
+  completedTransitFragmentIds.set(id, Date.now());
+  const cutoff = Date.now() - 30 * 60 * 1000;
+  for (const [completedId, completedAt] of completedTransitFragmentIds) {
+    if (completedAt < cutoff) completedTransitFragmentIds.delete(completedId);
+  }
+}
 
 /**
  * @description: 尝试获取客户端唯一id，依赖管理员权限与注册表读取
@@ -916,9 +925,31 @@ function initClientEvent() {
     }
   });
 
-  client.on("printByFragments", (data) => {
-    if (!data) return;
+  client.on("printByFragments", (data, acknowledge) => {
+    const ack = (payload) => {
+      if (typeof acknowledge === "function") acknowledge(payload);
+    };
+    if (!data) {
+      ack({ ok: false, message: "打印排版分片为空" });
+      return;
+    }
     const { total, index, htmlFragment, id } = data;
+    if (
+      typeof id !== "string" ||
+      !Number.isInteger(total) ||
+      total < 1 ||
+      !Number.isInteger(index) ||
+      index < 0 ||
+      index >= total ||
+      typeof htmlFragment !== "string"
+    ) {
+      ack({ ok: false, message: "打印排版分片格式无效" });
+      return;
+    }
+    if (completedTransitFragmentIds.has(id)) {
+      ack({ ok: true, duplicate: true, index });
+      return;
+    }
     const currentInfo =
       PRINT_FRAGMENTS_MAPPING[id] ||
       (PRINT_FRAGMENTS_MAPPING[id] = {
@@ -930,9 +961,15 @@ function initClientEvent() {
     if (currentInfo.fragments[index] === undefined) currentInfo.count++;
     currentInfo.fragments[index] = htmlFragment;
     currentInfo.updateTime = Date.now();
+    console.log(
+      `中转服务 ${client.id}: 已接收打印排版 ${currentInfo.count}/${currentInfo.total}`,
+    );
     if (currentInfo.count === currentInfo.total) {
       delete PRINT_FRAGMENTS_MAPPING[id];
       data.html = currentInfo.fragments.join("");
+      rememberCompletedTransitFragment(id);
+      ack({ ok: true, index, complete: true });
+      console.log(`中转服务 ${client.id}: 打印排版接收完成，加入打印队列`);
       PRINT_RUNNER.add((done) => {
         data.socketId = client.id;
         data.taskId = uuidv7();
@@ -941,6 +978,8 @@ function initClientEvent() {
         MAIN_WINDOW.webContents.send("printTask", true);
         PRINT_RUNNER_DONE[data.taskId] = done;
       });
+    } else {
+      ack({ ok: true, index });
     }
     watchTaskInstance.startWatch();
   });
