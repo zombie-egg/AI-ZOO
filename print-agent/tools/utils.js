@@ -916,6 +916,35 @@ function initClientEvent() {
     }
   });
 
+  client.on("printByFragments", (data) => {
+    if (!data) return;
+    const { total, index, htmlFragment, id } = data;
+    const currentInfo =
+      PRINT_FRAGMENTS_MAPPING[id] ||
+      (PRINT_FRAGMENTS_MAPPING[id] = {
+        total,
+        fragments: [],
+        count: 0,
+        updateTime: 0,
+      });
+    if (currentInfo.fragments[index] === undefined) currentInfo.count++;
+    currentInfo.fragments[index] = htmlFragment;
+    currentInfo.updateTime = Date.now();
+    if (currentInfo.count === currentInfo.total) {
+      delete PRINT_FRAGMENTS_MAPPING[id];
+      data.html = currentInfo.fragments.join("");
+      PRINT_RUNNER.add((done) => {
+        data.socketId = client.id;
+        data.taskId = uuidv7();
+        data.clientType = "transit";
+        PRINT_WINDOW.webContents.send("print-new", data);
+        MAIN_WINDOW.webContents.send("printTask", true);
+        PRINT_RUNNER_DONE[data.taskId] = done;
+      });
+    }
+    watchTaskInstance.startWatch();
+  });
+
   client.on("render-print", (data) => {
     if (data) {
       RENDER_RUNNER.add((done) => {

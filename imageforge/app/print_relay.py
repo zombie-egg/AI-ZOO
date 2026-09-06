@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import re
 import os
+import asyncio
+import uuid
 from collections import defaultdict
+from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
@@ -14,6 +17,8 @@ MAX_HTML_CHARS = 15 * 1024 * 1024
 PUBLIC_HOST = urlparse(
     os.getenv("PUBLIC_BASE_URL", "https://ai-zoo-zombie.zeabur.app")
 ).hostname
+PRIVATE_ROOT = Path(os.getenv("PRIVATE_DIR", "/data/imageforge/private"))
+PRINT_FRAGMENT_CHARS = 96 * 1024
 
 
 def _valid_print_url(value: Any) -> bool:
@@ -27,6 +32,16 @@ def _valid_print_url(value: Any) -> bool:
         and parsed.path.endswith("/print_payload.html")
         and bool(parsed.query)
     )
+
+
+def _generation_id_from_print_url(value: str) -> str | None:
+    if not _valid_print_url(value):
+        return None
+    match = re.fullmatch(
+        r"/private-delivery/([A-Za-z0-9_-]{8,128})/print_payload\.html",
+        urlparse(value).path,
+    )
+    return match.group(1) if match else None
 
 sio = socketio.AsyncServer(
     async_mode="asgi",
@@ -150,7 +165,47 @@ async def print_job(sid: str, payload: Any) -> None:
     safe_payload = dict(payload)
     safe_payload["copies"] = 1
     safe_payload["pageRanges"] = {"from": 0, "to": 0}
-    await sio.emit("news", safe_payload, to=agent_sid)
+    if has_inline_html:
+        await sio.emit("news", safe_payload, to=agent_sid)
+        return
+
+    generation_id = _generation_id_from_print_url(str(html_url))
+    print_path = PRIVATE_ROOT / "generation" / str(generation_id) / "print_payload.html"
+    try:
+        print_html = await asyncio.to_thread(print_path.read_text, encoding="utf-8")
+    except (OSError, UnicodeError) as error:
+        await sio.emit(
+            "error",
+            {"templateId": payload.get("templateId"), "message": f"服务器读取打印排版失败：{error}"},
+            to=sid,
+        )
+        return
+    if not print_html or len(print_html) > MAX_HTML_CHARS:
+        await sio.emit(
+            "error",
+            {"templateId": payload.get("templateId"), "message": "服务器打印排版为空或过大"},
+            to=sid,
+        )
+        return
+
+    safe_payload.pop("htmlUrl", None)
+    fragment_id = uuid.uuid4().hex
+    fragments = [
+        print_html[index : index + PRINT_FRAGMENT_CHARS]
+        for index in range(0, len(print_html), PRINT_FRAGMENT_CHARS)
+    ]
+    for index, fragment in enumerate(fragments):
+        await sio.emit(
+            "printByFragments",
+            {
+                **safe_payload,
+                "id": fragment_id,
+                "total": len(fragments),
+                "index": index,
+                "htmlFragment": fragment,
+            },
+            to=agent_sid,
+        )
 
 
 for event_name in (
