@@ -535,7 +535,7 @@ async function beginPrinting() {
     return;
   }
   go("printing");
-  secondsLeft.value = 240;
+  secondsLeft.value = 360;
   try {
     await kioskApi.reportPrintStatus(order.value.id, "printing");
     flowTimer = window.setInterval(() => {

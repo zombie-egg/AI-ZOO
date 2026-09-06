@@ -74,7 +74,7 @@ export function printPhoto({ html, htmlUrl, orderNo, copies = 1 }) {
     const cleanup = () => { socket.off('success', success); socket.off('error', failure); clearTimeout(timeout) }
     const success = (payload) => { if (matches(payload)) { cleanup(); resolve(payload) } }
     const failure = (payload) => { if (matches(payload)) { cleanup(); reject(new Error(payload?.message || payload?.msg || '打印失败')) } }
-    const timeout = setTimeout(() => { cleanup(); reject(new Error('240 秒内未收到打印完成回调')) }, 240000)
+    const timeout = setTimeout(() => { cleanup(); reject(new Error('360 秒内未收到打印完成回调')) }, 360000)
     socket.on('success', success)
     socket.on('error', failure)
     socket.emit('news', {
