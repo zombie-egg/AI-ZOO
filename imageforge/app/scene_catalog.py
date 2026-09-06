@@ -92,6 +92,16 @@ suggestions, and must remain natural in a high-resolution printed photograph:
   but do not enlarge the eyes or change their shape or spacing.
 - FINISH: gently soften harsh facial shadows, balance facial exposure, and keep lips and teeth clean
   and natural without heavy makeup or artificial recoloring.
+
+FACIAL EXPRESSION — OVERRIDES ANY CONFLICTING SMILE WORDING IN THE SELECTED SCENE:
+- Give every visitor a restrained, gentle micro-smile: only a slight natural lift at the corners of
+  the mouth, relaxed cheeks, calm eyes, and a friendly but composed expression.
+- Keep the lips naturally closed, or at most imperceptibly parted, with NO visible teeth. Preserve
+  each person's real lip shape and do not enlarge, reshape, over-saturate, or heavily retouch lips.
+- Absolutely no broad grin, toothy smile, open-mouth smile, laughing expression, exaggerated raised
+  cheeks, identical stock-photo smile, or forced commercial-model expression.
+- For two to four visitors, keep subtle individual variation in gaze and mouth-corner lift so the
+  group feels candid, while every person still has a gentle closed-mouth smile with no visible teeth.
 Do not use face averaging or change age, ethnicity, gender, hairstyle, or distinctive facial details.
 Preserve normal facial asymmetry, the exact outfit from reference image 1, and glasses if present.
 Glasses must have physically plausible reflections that do not hide both eyes.
@@ -391,7 +401,7 @@ def compose_generation_prompt(scene: ScenePrompt, pose: PosePrompt, participant_
 
 
 def composed_prompt_version(scene: ScenePrompt, pose: PosePrompt, participant_count: int = 1) -> str:
-    return f"{scene.prompt_version}+{pose.prompt_version}+group-{participant_count}-v1"
+    return f"{scene.prompt_version}+{pose.prompt_version}+group-{participant_count}-v1+expression-v2"
 
 
 def composed_prompt_hash(scene: ScenePrompt, pose: PosePrompt, participant_count: int = 1) -> str:
