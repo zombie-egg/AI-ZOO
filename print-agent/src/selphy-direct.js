@@ -1,27 +1,19 @@
 "use strict";
 
 const childProcess = require("child_process");
+const fs = require("fs");
+const os = require("os");
+const path = require("path");
 const { promisify } = require("util");
-const ipp = require("ipp");
 const { Jimp } = require("jimp");
 
 const execFile = promisify(childProcess.execFile);
-const sleep = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 
 const PAPER_PROFILES = [
   { match: "89x119mm", media: "om_dsc-photo_89x119mm", width: 8900, height: 11900, pixelsWide: 1051, pixelsHigh: 1406 },
   { match: "100x148mm", media: "jpn_hagaki_100x148mm", width: 10000, height: 14800, pixelsWide: 1181, pixelsHigh: 1748 },
   { match: "54x86mm", media: "custom_54x86mm_54x86mm", width: 5400, height: 8600, pixelsWide: 638, pixelsHigh: 1016 },
 ];
-
-function execute(printer, operation, message) {
-  return new Promise((resolve, reject) => {
-    printer.execute(operation, message, (error, response) => {
-      if (error) reject(error);
-      else resolve(response || {});
-    });
-  });
-}
 
 async function discoverPrinterUri() {
   const { stdout } = await execFile("/usr/bin/ippfind", ["-T", "5"], { timeout: 8000 });
@@ -66,61 +58,77 @@ async function baselineJpeg(source, profile) {
   return image.getBuffer("image/jpeg", { quality: 92 });
 }
 
-async function waitForJob(printerUri, jobId) {
-  const deadline = Date.now() + 180000;
-  // Print-Job 只有在设备接受任务并返回 job-id 后才进入这里；即使首轮轮询时
-  // 设备已经完成，也应允许 idle 被识别为成功。
-  let sawProcessing = true;
-  while (Date.now() < deadline) {
-    const status = await readPrinterState(printerUri);
-    if (status.state === "processing") sawProcessing = true;
-    if (status.reasons !== "none" && status.reasons !== "unknown") {
-      throw new Error(`CP1500 打印异常：${status.reasons}`);
+function printJobTest(profile) {
+  return `{
+  NAME "AI ZOO SELPHY photo"
+  OPERATION Print-Job
+  GROUP operation-attributes-tag
+  ATTR charset attributes-charset utf-8
+  ATTR language attributes-natural-language zh-cn
+  ATTR uri printer-uri $uri
+  ATTR name requesting-user-name $user
+  ATTR mimeMediaType document-format image/jpeg
+  GROUP job-attributes-tag
+  ATTR integer copies 1
+  ATTR keyword media ${profile.media}
+  ATTR collection media-col {
+    MEMBER collection media-size {
+      MEMBER integer x-dimension ${profile.width}
+      MEMBER integer y-dimension ${profile.height}
     }
-    if (sawProcessing && status.state === "idle") {
-      return { jobId, reasons: "job-completed-successfully", impressions: 1 };
-    }
-    await sleep(1000);
+    MEMBER integer media-left-margin 0
+    MEMBER integer media-right-margin 0
+    MEMBER integer media-top-margin 0
+    MEMBER integer media-bottom-margin 0
+    MEMBER keyword media-type photographic
+    MEMBER keyword media-source photo
   }
-  throw new Error("CP1500 直连打印超过 180 秒仍未完成");
+  ATTR keyword print-color-mode color
+  ATTR enum print-quality 4
+  FILE $filename
+  STATUS successful-ok
+  STATUS successful-ok-ignored-or-substituted-attributes
+  EXPECT job-id OF-TYPE integer WITH-VALUE >0
+}
+{
+  NAME "Wait for SELPHY job completion"
+  OPERATION Get-Job-Attributes
+  GROUP operation-attributes-tag
+  ATTR charset attributes-charset utf-8
+  ATTR language attributes-natural-language zh-cn
+  ATTR uri printer-uri $uri
+  ATTR integer job-id $job-id
+  ATTR name requesting-user-name $user
+  STATUS successful-ok
+  EXPECT job-id
+  EXPECT job-state WITH-VALUE >5 REPEAT-NO-MATCH
+  DISPLAY job-state
+  DISPLAY job-state-reasons
+}`;
 }
 
 async function printSelphyDirect(printHtml, jobName) {
   const printerUri = await discoverPrinterUri();
-  const printer = ipp.Printer(printerUri);
   const profile = await currentPaper(printerUri);
   const jpeg = await baselineJpeg(extractEmbeddedJpeg(printHtml), profile);
-  const response = await execute(printer, "Print-Job", {
-    "operation-attributes-tag": {
-      "attributes-charset": "utf-8",
-      "attributes-natural-language": "zh-cn",
-      "printer-uri": printerUri,
-      "requesting-user-name": process.env.USER || "ai-zoo",
-      "job-name": jobName || "AI-ZOO photo",
-      "document-format": "image/jpeg",
-    },
-    "job-attributes-tag": {
-      copies: 1,
-      media: profile.media,
-      "media-col": {
-        "media-size": { "x-dimension": profile.width, "y-dimension": profile.height },
-        "media-left-margin": 0,
-        "media-right-margin": 0,
-        "media-top-margin": 0,
-        "media-bottom-margin": 0,
-        "media-type": "photographic",
-        "media-source": "photo",
-      },
-      "print-color-mode": "color",
-      "print-quality": 4,
-      "printer-resolution": "300dpi",
-    },
-    data: jpeg,
-  });
-  const jobAttrs = response["job-attributes-tag"] || {};
-  const jobId = Number(jobAttrs["job-id"] || 0);
-  if (!jobId) throw new Error("CP1500 未返回有效任务编号");
-  return { ...(await waitForJob(printerUri, jobId)), media: profile.media };
+  const tempDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), "ai-zoo-selphy-"));
+  const imagePath = path.join(tempDir, "photo.jpg");
+  const testPath = path.join(tempDir, "print-and-wait.test");
+  try {
+    await fs.promises.writeFile(imagePath, jpeg);
+    await fs.promises.writeFile(testPath, printJobTest(profile), "utf8");
+    const { stdout } = await execFile(
+      "/usr/bin/ipptool",
+      ["-tv", "-T", "240", "-d", `job-name=${jobName || "AI-ZOO photo"}`, "-f", imagePath, printerUri, testPath],
+      { timeout: 300000, maxBuffer: 4 * 1024 * 1024 },
+    );
+    const output = String(stdout);
+    const jobId = Number(output.match(/job-id \(integer\) = (\d+)/)?.[1] || 0);
+    if (!jobId) throw new Error("CP1500 未返回有效任务编号");
+    return { jobId, reasons: "job-completed-successfully", impressions: 1, media: profile.media };
+  } finally {
+    await fs.promises.rm(tempDir, { recursive: true, force: true });
+  }
 }
 
 module.exports = { printSelphyDirect };
