@@ -33,7 +33,6 @@ const stages = [
   "capture",
   "capture_review",
   "group_review",
-  "pay",
   "generating",
   "quality_review",
   "printing",
@@ -217,29 +216,32 @@ async function chooseParticipantCount(count) {
   currentParticipantIndex.value = 0;
   try {
     go("scan");
-    const value = `${location.origin}/mobile/pages/kiosk/start`;
-    qr.value = await QRCode.toDataURL(value, {
-      width: 320,
-      margin: 1,
-      color: { dark: "#143128", light: "#ffffff" },
-    });
-  } catch (error) {
-    fail("场景服务暂时不可用", error.message, true, "idle");
-  }
-}
-
-async function finishScan() {
-  try {
     order.value = await kioskApi.createOrder({
       source: "kiosk",
       consent_given: false,
       participant_count: participantCount.value,
     });
-    currentParticipantIndex.value = 0;
-    go("consent");
+    const payment = await kioskApi.createPayment(order.value.id);
+    paymentMode.value = payment.payment_mode || "wechat_native";
+    paymentAmount.value = Number(payment.amount ?? kioskConfig.price);
+    if (payment.paid) {
+      enterConsentFlow();
+      return;
+    }
+    qr.value = await QRCode.toDataURL(payment.code_url, {
+      width: 330,
+      margin: 1,
+      color: { dark: "#143128", light: "#ffffff" },
+    });
+    pollPayment();
   } catch (error) {
-    fail("订单创建失败", error.message, true, "scan");
+    fail("微信支付二维码生成失败", error.message, true, "people");
   }
+}
+
+function enterConsentFlow() {
+  currentParticipantIndex.value = 0;
+  go("consent");
 }
 
 async function acceptConsent() {
@@ -406,23 +408,19 @@ async function confirmParticipantPhotos() {
   }
 }
 
-async function proceedToPayment() {
-  go("pay");
+async function proceedToGeneration() {
+  if (busy.value) return;
+  busy.value = true;
   try {
-    const payment = await kioskApi.createPayment(order.value.id);
-    paymentMode.value = payment.payment_mode || "wechat_native";
-    paymentAmount.value = Number(payment.amount ?? kioskConfig.price);
-    if (payment.paid) {
-      await beginGeneration(false);
-      return;
+    const state = await kioskApi.getStatus(order.value.id);
+    if (state.unlock_status !== "paid") {
+      throw new Error("未查到微信支付成功状态");
     }
-    qr.value = await QRCode.toDataURL(payment.code_url, {
-      width: 330,
-      margin: 1,
-    });
-    pollPayment();
+    busy.value = false;
+    await beginGeneration(false);
   } catch (error) {
-    fail("支付二维码生成失败", error.message, true, "group_review");
+    busy.value = false;
+    fail("支付状态确认失败", error.message, true, "group_review");
   }
 }
 
@@ -446,7 +444,7 @@ function pollPayment() {
       const state = await kioskApi.getStatus(order.value.id);
       if (state.unlock_status === "paid") {
         clearFlowTimer();
-        await beginGeneration(false);
+        enterConsentFlow();
       }
     } catch (error) {
       message.value = `支付状态重连中：${error.message}`;
@@ -463,7 +461,7 @@ async function beginGeneration(operatorTest = false) {
     secondsLeft.value = 90;
     pollGeneration();
   } catch (error) {
-    fail("GPT-image-2 任务创建失败", error.message, true, "pay");
+    fail("GPT-image-2 任务创建失败", error.message, true, "group_review");
   } finally {
     busy.value = false;
   }
@@ -688,17 +686,22 @@ onBeforeUnmount(() => {
 
     <section v-else-if="screen === 'scan'" class="center-panel compact">
       <button class="back-button" @click="go('people')">← 重选人数</button>
-      <p class="scene-kicker">第 2 步 · 扫码开始 · {{ participantCount }} 人</p>
-      <h2>请用微信扫码开始</h2>
-      <img class="qr-image" :src="qr" alt="开始体验二维码" /><button
-        v-if="kioskConfig.localOperatorMode"
-        class="primary-action small"
-        @click="finishScan"
+      <p class="scene-kicker">第 2 步 · 微信支付 · {{ participantCount }} 人</p>
+      <h2>微信扫码支付 ¥{{ paymentAmount.toFixed(2) }}</h2>
+      <img v-if="qr" class="qr-image" :src="qr" alt="微信支付二维码" />
+      <p v-else class="payment-loading">正在创建支付订单…</p>
+      <button
+        class="primary-action small mock-payment-action"
+        :disabled="paymentBusy || !paymentMode"
+        @click="simulateWechatPayment"
       >
-        本机联调：跳过微信扫码
+        {{ paymentBusy ? "正在确认…" : "模拟完成微信支付" }}
       </button>
+      <p v-if="paymentMode === 'mock'" class="payment-mode-note">
+        当前未接入微信商户号，可用上方按钮测试完整流程。
+      </p>
       <p class="privacy-note">
-        随后 {{ participantCount }} 位参与者将依次完成人脸信息授权。
+        支付成功后，{{ participantCount }} 位参与者将依次完成人脸信息授权。
       </p>
     </section>
 
@@ -905,50 +908,9 @@ onBeforeUnmount(() => {
           </div>
         </section>
       </div>
-      <button class="primary-action small" @click="proceedToPayment">
+      <button class="primary-action small" :disabled="busy" @click="proceedToGeneration">
         确认所有人，继续生成 →
       </button>
-    </section>
-
-    <section v-else-if="screen === 'pay'" class="center-panel compact">
-      <button class="back-button" @click="go('group_review')">
-        ← 返回全员确认
-      </button>
-      <p class="scene-kicker">
-        {{ participantCount }} 人合照 · 付款成功后生成
-      </p>
-      <h2>微信扫码支付 ¥{{ paymentAmount.toFixed(2) }}</h2>
-      <img
-        v-if="qr"
-        class="qr-image"
-        :src="qr"
-        alt="微信支付二维码"
-      />
-      <button
-        class="primary-action small mock-payment-action"
-        :disabled="paymentBusy || !paymentMode"
-        @click="simulateWechatPayment"
-      >
-        {{ paymentBusy ? "正在确认…" : "模拟完成微信支付" }}
-      </button>
-      <p v-if="paymentMode === 'mock'" class="payment-mode-note">
-        当前未接入微信商户号，上方为流程测试二维码。
-      </p>
-      <p class="subcopy">
-        将按人物分组发送
-        {{ participantCount * 4 }} 张原图，严格区分每个人的身份与服装，并使用“{{
-          selectedScene?.title
-        }}
-        · {{ selectedPose?.title }}”构图及逐人美颜。
-      </p>
-      <p class="status-note">
-        {{
-          message ||
-          (paymentMode === "mock"
-            ? "点击模拟支付后，系统仍会等待后端确认 paid 状态。"
-            : "正在安全轮询微信支付状态…")
-        }}
-      </p>
     </section>
 
     <section v-else-if="screen === 'generating'" class="center-panel">

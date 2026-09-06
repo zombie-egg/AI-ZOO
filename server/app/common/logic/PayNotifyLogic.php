@@ -20,7 +20,6 @@ use app\common\enum\QueueNameConst;
 use app\common\enum\user\AccountLogEnum;
 use app\common\model\member\MemberOrder;
 use app\common\model\kiosk\KioskOrder;
-use app\common\model\kiosk\KioskOutbox;
 use app\common\model\kiosk\UnlockOrder;
 use app\common\model\recharge\RechargeOrder;
 use app\common\model\user\User;
@@ -161,8 +160,8 @@ class PayNotifyLogic extends BaseLogic
     }
 
     /**
-     * Kiosk 后付解锁：只在事务内确认支付并写 outbox，不在微信回调中等待 AI 网络调用。
-     * event_key 唯一键 + 行锁保证微信重复通知不会重复创建付费直连生成。
+     * Kiosk 前置支付解锁：回调只确认到账，不在照片尚未采集时提前创建 AI 任务。
+     * 行锁与 pay_status 短路保证微信重复通知幂等。
      */
     public static function unlock($orderSn, $extra = [])
     {
@@ -185,14 +184,6 @@ class PayNotifyLogic extends BaseLogic
             throw new \RuntimeException('关联 Kiosk 订单不存在');
         }
         $kiosk->save(['unlock_status' => 'paid', 'status' => 'paid']);
-        KioskOutbox::create([
-            'event_key' => 'direct-generate:' . $order->id,
-            'event_type' => 'generate_paid_order',
-            'aggregate_id' => $order->id,
-            'payload_json' => json_encode(['order_no' => $kiosk->order_no], JSON_UNESCAPED_UNICODE),
-            'status' => 'pending',
-            'available_time' => time(),
-        ]);
         KioskAuditService::record($kiosk->order_no, 'payment', [
             'unlock_order_id' => $order->id,
             'amount' => (float)$order->order_amount,

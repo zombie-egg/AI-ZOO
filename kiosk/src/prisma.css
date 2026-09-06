@@ -343,6 +343,17 @@ button, a { letter-spacing: .065em; }
   min-width: 360px;
   margin: 18px auto 8px;
 }
+.payment-loading {
+  display: grid;
+  place-items: center;
+  width: min(30vh, 300px);
+  min-height: 180px;
+  margin: 18px 0;
+  border: 1px solid rgba(0,0,0,.12);
+  border-radius: 20px;
+  color: rgba(0,0,0,.58);
+  background: rgba(255,255,255,.7);
+}
 
 /* Final monochrome tea-brand direction: pure white paper, black type, fine geometry. */
 .kiosk-shell:not([data-screen="idle"]) {

@@ -276,8 +276,8 @@ class KioskLogic extends BaseLogic
     public static function createPayment(int $id, string $sku): array
     {
         $order = self::order($id);
-        if (!$order->scene_id || !$order->pose_id || $order->status !== 'captured') {
-            throw new \RuntimeException('请先选择场景和姿势，并完成每位参与者的四连拍');
+        if ($order->status === 'deleted') {
+            throw new \RuntimeException('订单已结束，无法创建支付');
         }
         $catalog = ['print_1' => 9.90, 'digital_only' => 9.90];
         if (!isset($catalog[$sku])) {
