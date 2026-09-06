@@ -13,7 +13,17 @@ PREPARE stmt FROM @ddl; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 SET @ddl = (
   SELECT IF(COUNT(*) = 0,
-    'ALTER TABLE `ai_kiosk_order` ADD COLUMN `prompt_version` varchar(64) NOT NULL DEFAULT '''' AFTER `scene_id`',
+    'ALTER TABLE `ai_kiosk_order` ADD COLUMN `prompt_version` varchar(255) NOT NULL DEFAULT '''' AFTER `scene_id`',
+    'SELECT 1')
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'ai_kiosk_order' AND COLUMN_NAME = 'prompt_version'
+);
+PREPARE stmt FROM @ddl; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- Prompt 版本由场景、姿势、人数和生成规则组成，64 字符不足以完整保存。
+SET @ddl = (
+  SELECT IF(COALESCE(MAX(CHARACTER_MAXIMUM_LENGTH), 0) < 255,
+    'ALTER TABLE `ai_kiosk_order` MODIFY COLUMN `prompt_version` varchar(255) NOT NULL DEFAULT ''''',
     'SELECT 1')
   FROM information_schema.COLUMNS
   WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'ai_kiosk_order' AND COLUMN_NAME = 'prompt_version'

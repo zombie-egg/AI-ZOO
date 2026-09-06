@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS `ai_kiosk_order` (
   `guardian_confirmed` tinyint(1) NOT NULL DEFAULT 0,
   `scene_id` varchar(64) NOT NULL DEFAULT '',
   `pose_id` varchar(32) NOT NULL DEFAULT '',
-  `prompt_version` varchar(64) NOT NULL DEFAULT '',
+  `prompt_version` varchar(255) NOT NULL DEFAULT '',
   `prompt_hash` char(64) NOT NULL DEFAULT '',
   `generation_id` varchar(64) NOT NULL DEFAULT '',
   -- 以下预览字段仅兼容历史订单；V4 新流程不再读取。
