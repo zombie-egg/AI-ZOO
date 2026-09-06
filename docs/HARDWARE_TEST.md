@@ -23,12 +23,11 @@ ffmpeg -hide_banner -list_options true -f dshow -i video="1200W Camera"
 
 ## CP1500 临时测试规范
 
-佳能中国官方规格确认：SELPHY CP1500 是染料热升华打印，最大 `300×300dpi`；明信片无边框成像尺寸 `100×148mm`，电脑连接口为 USB Type-C。Phase 2 的 `print_payload.html` 已据此设置页面，不再使用泛化的 101.6×152.4mm 美式 4×6 尺寸。
+佳能中国官方规格确认：SELPHY CP1500 是染料热升华打印，最大 `300×300dpi`，电脑连接口为 USB Type-C。当前现场装载的是 KL 系列 L 尺寸相纸，打印机通过 IPP 报告的实际尺寸为 `89×119mm`，因此打印页面和本机任务默认使用该尺寸；若换回 KP 明信片纸，通过 `PRINT_PAGE_WIDTH_MM=100`、`PRINT_PAGE_HEIGHT_MM=148` 及对应的 Vite 变量切换。
 
-- 目标画布：`100×148mm`；按 300dpi 换算约 `1181×1748px`。
+- 当前目标画布：`89×119mm`；打印前必须核对驱动报告的 `media-ready`，避免纸盒尺寸和任务尺寸不一致导致 `other-error`。
 - 当前业务要求仍保留四周 3mm 白边和底部 2mm “AI 生成 · 订单号”小字。
 - 接上打印机后必须补做：驱动纸型选择、横竖方向、系统是否二次缩放、白边实际毫米数、肤色色偏、暗部层次、连续 10 张进出纸。
 - 真正商业打印机更换时只新增 printer profile，不改终图和订单协议。
 
 官方依据：[佳能中国 CP1500 产品规格](https://www.canon.com.cn/product/cp1500/spec.html)、[佳能中国 CP1500 对应耗材](https://m.canon.com.cn/product/cp1500/supply.html)。
-

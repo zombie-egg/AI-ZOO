@@ -20,4 +20,5 @@ def test_print_payload_is_embedded_and_single_page(settings):
     assert "<html" not in payload
     assert "<body" not in payload
     assert 'class="photo-print-sheet hiprint-printPaper"' in payload
+    assert "@page{size:89mm 119mm;margin:0}" in payload
     assert "page-break-after:avoid" in payload

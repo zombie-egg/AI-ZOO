@@ -155,7 +155,14 @@ def run_direct_generation_pipeline(
     final_image = upscale_long_edge(load_rgb(best_candidate), 2048)
     save_jpeg(final_image, final_path, quality=95)
     final_url = signed_delivery_url(settings, job_id, final_path.name)
-    create_print_payload(final_url, job["order_no"], print_path, image_path=final_path)
+    create_print_payload(
+        final_url,
+        job["order_no"],
+        print_path,
+        image_path=final_path,
+        page_width_mm=settings.print_page_width_mm,
+        page_height_mm=settings.print_page_height_mm,
+    )
     qa_payload = {
         "manual_review_required": True,
         "identity_engine": face_engine.name,

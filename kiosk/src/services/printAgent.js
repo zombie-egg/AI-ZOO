@@ -45,8 +45,13 @@ export function printPhoto({ html, orderNo, copies = 1 }) {
     socket.on('error', failure)
     socket.emit('news', {
       html, templateId: orderNo, printer: activePrinterName,
-      // CP1500 明信片纸是 100×148 mm；实际驱动边距须现场打一张校准。
-      pageSize: { width: 100000, height: 148000, unit: '' },
+      // 当前现场使用 CP1500 KL 系列 L 尺寸相纸（89×119 mm）。
+      // 保留环境变量覆盖，以便换成 KP 明信片纸时改为 100×148，而无需改代码。
+      pageSize: {
+        width: Math.round(kioskConfig.printPageWidthMm * 1000),
+        height: Math.round(kioskConfig.printPageHeightMm * 1000),
+        unit: '',
+      },
       // 防止 Chromium 或驱动尺寸取整后意外产生第二页、浪费相纸。
       pageRanges: { from: 0, to: 0 }, copies, rePrintAble: true,
     })

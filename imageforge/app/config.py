@@ -53,6 +53,9 @@ class Settings(BaseSettings):
     signing_secret: str = "change-signing-secret"
     storage_mode: str = "local"
     gpt_image_estimated_cost_cents: int = Field(default=30, ge=0)
+    # 现场 CP1500 当前装载 KL 系列 L 尺寸相纸；KP 明信片纸可通过环境变量改为 100×148。
+    print_page_width_mm: int = Field(default=89, ge=50, le=110)
+    print_page_height_mm: int = Field(default=119, ge=80, le=160)
 
     def prepare_directories(self) -> None:
         for directory in (self.database_path.parent, self.private_dir):

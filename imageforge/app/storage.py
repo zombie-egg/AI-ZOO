@@ -29,7 +29,12 @@ def upscale_long_edge(image: Image.Image, long_edge: int) -> Image.Image:
 
 
 def create_print_payload(
-    image_url: str, order_no: str, destination: Path, image_path: Path | None = None
+    image_url: str,
+    order_no: str,
+    destination: Path,
+    image_path: Path | None = None,
+    page_width_mm: int = 89,
+    page_height_mm: int = 119,
 ) -> None:
     # 打印代理会把此片段注入自己的页面，不能再嵌套 html/body，否则 Chromium 会错误分页。
     # 优先内嵌图片，避免打印瞬间的网络请求造成空白页。
@@ -38,7 +43,7 @@ def create_print_payload(
         encoded = base64.b64encode(image_path.read_bytes()).decode("ascii")
         source = f"data:image/jpeg;base64,{encoded}"
     content = f"""<style>
-@page{{size:100mm 148mm;margin:0}}
+@page{{size:{page_width_mm}mm {page_height_mm}mm;margin:0}}
 html,body,#printElement{{margin:0!important;padding:0!important;width:100%!important;height:100%!important;overflow:hidden!important}}
 .photo-print-sheet{{box-sizing:border-box;width:100%;height:100%;padding:3mm 3mm 5mm;background:#fff;display:flex;flex-direction:column;overflow:hidden;break-after:avoid;page-break-after:avoid}}
 .photo-print-sheet img{{display:block;min-width:0;width:100%;height:calc(100% - 4mm);object-fit:cover}}
