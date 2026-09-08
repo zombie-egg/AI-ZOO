@@ -249,7 +249,7 @@ async function createWindow() {
         MAIN_WINDOW.show();
       }
       // 未打包时打开开发者工具
-      if (!app.isPackaged) {
+      if (!app.isPackaged && process.env.AI_ZOO_FIELD_MODE !== "1") {
         MAIN_WINDOW.webContents.openDevTools();
       }
       // 本地服务开启端口监听

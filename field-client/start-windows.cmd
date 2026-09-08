@@ -1,37 +1,31 @@
 @echo off
 setlocal EnableExtensions
-set "PROJECT_DIR=%~dp0.."
-set "CONFIG_DIR=%LOCALAPPDATA%\AI-ZOO"
-set "TERMINAL_FILE=%CONFIG_DIR%\terminal-id.txt"
-set "RUNNER_FILE=%CONFIG_DIR%\run-print-agent.cmd"
-set "STARTUP_FILE=%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup\AI-ZOO-Print-Agent.cmd"
-set "CLOUD_URL=https://ai-zoo-zombie.zeabur.app"
+chcp 65001 >nul
 
-where node >nul 2>nul || (
-  echo Please install Node.js 20 or newer from https://nodejs.org
-  pause
-  exit /b 1
-)
+set "SETUP_SCRIPT=%~dp0setup-windows.ps1"
+set "DOWNLOADED_SCRIPT=%TEMP%\AI-ZOO-setup-windows.ps1"
 
-if not exist "%CONFIG_DIR%" mkdir "%CONFIG_DIR%"
-if not exist "%TERMINAL_FILE%" powershell -NoProfile -Command "$id=[guid]::NewGuid().ToString('N'); Set-Content -NoNewline -Encoding ascii '%TERMINAL_FILE%' $id"
-set /p TERMINAL_ID=<"%TERMINAL_FILE%"
+if exist "%SETUP_SCRIPT%" goto run_setup
 
-cd /d "%PROJECT_DIR%\print-agent"
-if not exist "node_modules\.bin\electron.cmd" call npm ci
-if errorlevel 1 exit /b 1
+echo [AI ZOO] Downloading the Windows one-click installer...
+powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -Command ^
+  "[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -UseBasicParsing 'https://raw.githubusercontent.com/zombie-egg/AI-ZOO/main/field-client/setup-windows.ps1' -OutFile '%DOWNLOADED_SCRIPT%'"
+if errorlevel 1 goto download_failed
+set "SETUP_SCRIPT=%DOWNLOADED_SCRIPT%"
 
->"%RUNNER_FILE%" echo @echo off
->>"%RUNNER_FILE%" echo cd /d "%PROJECT_DIR%\print-agent"
->>"%RUNNER_FILE%" echo set "AI_ZOO_PRINT_RELAY_URL=%CLOUD_URL%"
->>"%RUNNER_FILE%" echo set "AI_ZOO_TERMINAL_ID=%TERMINAL_ID%"
->>"%RUNNER_FILE%" echo npm start ^> "%%TEMP%%\ai-zoo-print-agent.log" 2^>^&1
->"%STARTUP_FILE%" echo @start "AI ZOO Print Agent" /min "%RUNNER_FILE%"
-
-start "AI ZOO Print Agent" /min "%RUNNER_FILE%"
-start "" "%CLOUD_URL%/kiosk/?terminal=%TERMINAL_ID%"
-echo AI ZOO background print service is installed and will start at login.
-echo From now on, only open: %CLOUD_URL%/kiosk/
-echo Terminal ID: %TERMINAL_ID%
-pause
+:run_setup
+powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%SETUP_SCRIPT%"
+if errorlevel 1 goto setup_failed
 exit /b 0
+
+:download_failed
+echo.
+echo [AI ZOO] Download failed. Check the Internet connection and run this file again.
+pause
+exit /b 1
+
+:setup_failed
+echo.
+echo [AI ZOO] Setup did not finish. Keep this window open and send the error above to support.
+pause
+exit /b 1
