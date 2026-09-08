@@ -173,8 +173,22 @@ function Install-PrintAgent([string]$NodeExe) {
     $env:ELECTRON_MIRROR = "https://npmmirror.com/mirrors/electron/"
     try {
         Push-Location $AgentRoot
-        & $npmCommand ci --no-audit --no-fund
-        if ($LASTEXITCODE -ne 0) { throw "npm ci exited with code $LASTEXITCODE." }
+        $packageLock = Join-Path $AgentRoot "package-lock.json"
+        if (Test-Path $packageLock) {
+            & $npmCommand ci --no-audit --no-fund
+            $npmExitCode = $LASTEXITCODE
+            if ($npmExitCode -ne 0) {
+                Write-Warning "npm ci failed; retrying with npm install."
+                & $npmCommand install --no-audit --no-fund --package-lock=false
+                $npmExitCode = $LASTEXITCODE
+            }
+        }
+        else {
+            Write-Warning "The archive has no package-lock.json; using npm install compatibility mode."
+            & $npmCommand install --no-audit --no-fund --package-lock=false
+            $npmExitCode = $LASTEXITCODE
+        }
+        if ($npmExitCode -ne 0) { throw "npm dependency installation exited with code $npmExitCode." }
     }
     finally {
         Pop-Location

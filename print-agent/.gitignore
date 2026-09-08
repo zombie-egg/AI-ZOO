@@ -13,8 +13,6 @@ yarn-error.log
 
 .babelrc
 .editorconfig
-package-lock.json
-
 run/
 out/
 .history/
