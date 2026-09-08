@@ -57,6 +57,11 @@ RUN python3 -m venv /opt/imageforge/.venv \
 COPY imageforge/ ./
 
 COPY --from=kiosk-builder /build/kiosk/dist/ /var/www/kiosk/
+COPY field-client/setup-windows.ps1 /var/www/windows-client/setup-windows.ps1
+COPY print-agent/ /opt/windows-print-agent/
+RUN cd /opt/windows-print-agent \
+    && python3 -c "import os,zipfile; z=zipfile.ZipFile('/var/www/windows-client/print-agent.zip','w',zipfile.ZIP_DEFLATED); [z.write(os.path.join(root,name),os.path.relpath(os.path.join(root,name),'.')) for root,_,files in os.walk('.') for name in files]; z.close()" \
+    && rm -rf /opt/windows-print-agent
 COPY deploy/nginx.conf.template /etc/nginx/templates/ai-zoo.conf.template
 COPY deploy/supervisord.conf /etc/supervisor/conf.d/ai-zoo.conf
 COPY deploy/start-cloud.sh /usr/local/bin/start-ai-zoo

@@ -16,7 +16,7 @@ if exist "%SETUP_SCRIPT%" goto run_setup
 
 echo [AI ZOO] Downloading the Windows one-click installer...
 "%AI_ZOO_POWERSHELL%" -NoLogo -NoProfile -ExecutionPolicy Bypass -Command ^
-  "[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -UseBasicParsing 'https://raw.githubusercontent.com/zombie-egg/AI-ZOO/main/field-client/setup-windows.ps1' -OutFile '%DOWNLOADED_SCRIPT%'"
+  "[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -UseBasicParsing 'https://ai-zoo-zombie.zeabur.app/windows-client/setup-windows.ps1' -OutFile '%DOWNLOADED_SCRIPT%'"
 if errorlevel 1 goto download_failed
 set "SETUP_SCRIPT=%DOWNLOADED_SCRIPT%"
 

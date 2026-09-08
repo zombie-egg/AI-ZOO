@@ -13,6 +13,12 @@ server {
         try_files $uri $uri/ /kiosk/index.html;
     }
 
+    location /windows-client/ {
+        alias /var/www/windows-client/;
+        add_header Cache-Control "no-store" always;
+        add_header X-Content-Type-Options "nosniff" always;
+    }
+
     location /private-delivery/ {
         proxy_pass http://127.0.0.1:8000;
         proxy_set_header Host $host;

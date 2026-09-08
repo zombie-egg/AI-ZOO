@@ -6,7 +6,7 @@ $ProgressPreference = "SilentlyContinue"
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
 $CloudUrl = "https://ai-zoo-zombie.zeabur.app"
-$RepositoryZipUrl = "https://github.com/zombie-egg/AI-ZOO/archive/refs/heads/main.zip"
+$AgentArchiveUrl = "$CloudUrl/windows-client/print-agent.zip"
 $InstallRoot = Join-Path $env:LOCALAPPDATA "AI-ZOO"
 $RuntimeRoot = Join-Path $InstallRoot "runtime"
 $AgentRoot = Join-Path $InstallRoot "print-agent"
@@ -121,7 +121,8 @@ function Install-PortableNode {
 
     Write-Step "Downloading the portable Node.js runtime (nothing is installed system-wide)..."
     New-Item -ItemType Directory -Path $RuntimeRoot -Force | Out-Null
-    $checksums = (Invoke-WebRequest -UseBasicParsing "https://nodejs.org/dist/latest-v20.x/SHASUMS256.txt").Content
+    $nodeMirror = "https://npmmirror.com/mirrors/node/latest-v20.x"
+    $checksums = (Invoke-WebRequest -UseBasicParsing "$nodeMirror/SHASUMS256.txt").Content
     $archiveName = [regex]::Match($checksums, "node-v[0-9.]+-win-x64\.zip").Value
     if (-not $archiveName) { throw "Could not resolve the current Node.js 20 Windows archive." }
     $checksumLine = @($checksums -split "`r?`n" | Where-Object { $_ -match ("\s" + [regex]::Escape($archiveName) + "$") })[0]
@@ -130,7 +131,7 @@ function Install-PortableNode {
 
     $archivePath = Join-Path $env:TEMP $archiveName
     $extractRoot = Join-Path $env:TEMP ("AI-ZOO-node-" + [guid]::NewGuid().ToString("N"))
-    Invoke-WebRequest -UseBasicParsing "https://nodejs.org/dist/latest-v20.x/$archiveName" -OutFile $archivePath
+    Invoke-WebRequest -UseBasicParsing "$nodeMirror/$archiveName" -OutFile $archivePath
     $actualHash = (Get-FileHash -Path $archivePath -Algorithm SHA256).Hash.ToLowerInvariant()
     if ($actualHash -ne $expectedHash) { throw "The downloaded Node.js archive failed SHA-256 verification." }
     Expand-Archive -Path $archivePath -DestinationPath $extractRoot -Force
@@ -150,27 +151,25 @@ function Install-PrintAgent([string]$NodeExe) {
     if (Test-Path $electronCommand) { return }
 
     Write-Step "Downloading and installing the AI ZOO Windows print service..."
-    $sourceArchive = Join-Path $env:TEMP "AI-ZOO-main.zip"
-    $sourceRoot = Join-Path $env:TEMP ("AI-ZOO-source-" + [guid]::NewGuid().ToString("N"))
-    Invoke-WebRequest -UseBasicParsing $RepositoryZipUrl -OutFile $sourceArchive
-    Expand-Archive -Path $sourceArchive -DestinationPath $sourceRoot -Force
-    $sourceAgent = Get-ChildItem -Path $sourceRoot -Directory |
-        ForEach-Object { Join-Path $_.FullName "print-agent" } |
-        Where-Object { Test-Path (Join-Path $_ "package.json") } |
-        Select-Object -First 1
-    if (-not $sourceAgent) { throw "The downloaded project does not contain print-agent." }
+    $sourceArchive = Join-Path $env:TEMP "AI-ZOO-print-agent.zip"
+    Invoke-WebRequest -UseBasicParsing $AgentArchiveUrl -OutFile $sourceArchive
 
     New-Item -ItemType Directory -Path $InstallRoot -Force | Out-Null
     if (Test-Path $AgentRoot) { Remove-Item -Path $AgentRoot -Recurse -Force }
-    Copy-Item -Path $sourceAgent -Destination $AgentRoot -Recurse -Force
+    New-Item -ItemType Directory -Path $AgentRoot -Force | Out-Null
+    Expand-Archive -Path $sourceArchive -DestinationPath $AgentRoot -Force
+    if (-not (Test-Path (Join-Path $AgentRoot "package.json"))) {
+        throw "The downloaded print service archive is invalid."
+    }
     Remove-Item -Path $sourceArchive -Force -ErrorAction SilentlyContinue
-    Remove-Item -Path $sourceRoot -Recurse -Force -ErrorAction SilentlyContinue
 
     $nodeDirectory = Split-Path $NodeExe -Parent
     $npmCommand = Join-Path $nodeDirectory "npm.cmd"
     $oldPath = $env:PATH
     $env:PATH = "$nodeDirectory;$WindowsSystemPath;$env:PATH"
     $env:npm_config_cache = Join-Path $InstallRoot "npm-cache"
+    $env:npm_config_registry = "https://registry.npmmirror.com"
+    $env:npm_config_sqlite3_binary_host_mirror = "https://npmmirror.com/mirrors/sqlite3"
     $env:ELECTRON_MIRROR = "https://npmmirror.com/mirrors/electron/"
     try {
         Push-Location $AgentRoot

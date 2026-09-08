@@ -1,0 +1,10 @@
+.git
+.gitignore
+**/node_modules
+**/out
+**/dist
+**/.DS_Store
+**/__pycache__
+**/*.pyc
+imageforge/.venv
+server/runtime

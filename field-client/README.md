@@ -10,6 +10,8 @@
   - 添加开机自启，并在桌面创建 `AI ZOO Photo Kiosk` 快捷方式；
   - 打开 Kiosk。首次拍照时只需允许浏览器使用摄像头。
 
+Windows 启动器和打印代理均从 `ai-zoo-zombie.zeabur.app` 下载，不依赖 GitHub；Node.js 与 npm 包使用国内镜像。
+
 Windows 的自动配置文件保存在 `%LOCALAPPDATA%\AI-ZOO`，打印日志为 `%LOCALAPPDATA%\AI-ZOO\print-agent.log`。Canon 官方保证 CP1500 的电脑 USB 打印环境为 Windows 11。如果 Windows 11 没有自动建立打印队列，脚本会打开“打印机和扫描仪”设置页；保持 CP1500 开机并点击“添加设备”即可，不需要重新运行网页服务。
 
 摄像头优先选择配置名称，找不到时自动使用系统默认摄像头。打印脚本只自动绑定 Canon SELPHY CP1500，避免误把照片发给办公室的其他打印机。
