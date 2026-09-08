@@ -17,6 +17,14 @@ $StartupFolder = [Environment]::GetFolderPath("Startup")
 $DesktopFolder = [Environment]::GetFolderPath("Desktop")
 $StartupShortcut = Join-Path $StartupFolder "AI-ZOO-Print-Agent.lnk"
 $KioskShortcut = Join-Path $DesktopFolder "AI ZOO Photo Kiosk.url"
+$WindowsPowerShellExe = Join-Path $env:SystemRoot "System32\WindowsPowerShell\v1.0\powershell.exe"
+$WindowsCmdExe = Join-Path $env:SystemRoot "System32\cmd.exe"
+$WindowsChcpExe = Join-Path $env:SystemRoot "System32\chcp.com"
+$WindowsSystemPath = @(
+    (Join-Path $env:SystemRoot "System32"),
+    (Join-Path $env:SystemRoot "System32\Wbem"),
+    (Join-Path $env:SystemRoot "System32\WindowsPowerShell\v1.0")
+) -join ";"
 
 function Write-Step([string]$Message) {
     Write-Host "`n[AI ZOO] $Message" -ForegroundColor Cyan
@@ -36,7 +44,7 @@ function Restart-AsAdministrator {
         "-ExecutionPolicy", "Bypass",
         "-File", ('"{0}"' -f $PSCommandPath)
     )
-    $process = Start-Process -FilePath "powershell.exe" -Verb RunAs -ArgumentList $arguments -Wait -PassThru
+    $process = Start-Process -FilePath $WindowsPowerShellExe -Verb RunAs -ArgumentList $arguments -Wait -PassThru
     exit $process.ExitCode
 }
 
@@ -161,7 +169,7 @@ function Install-PrintAgent([string]$NodeExe) {
     $nodeDirectory = Split-Path $NodeExe -Parent
     $npmCommand = Join-Path $nodeDirectory "npm.cmd"
     $oldPath = $env:PATH
-    $env:PATH = "$nodeDirectory;$env:PATH"
+    $env:PATH = "$nodeDirectory;$WindowsSystemPath;$env:PATH"
     $env:npm_config_cache = Join-Path $InstallRoot "npm-cache"
     $env:ELECTRON_MIRROR = "https://npmmirror.com/mirrors/electron/"
     try {
@@ -192,12 +200,12 @@ function Write-LaunchFiles([string]$NodeExe, [string]$TerminalId) {
     $agentBin = Join-Path $AgentRoot "node_modules\.bin"
     $runner = @"
 @echo off
-chcp 65001 >nul
+"$WindowsChcpExe" 65001 >nul
 cd /d "$AgentRoot"
 set "AI_ZOO_PRINT_RELAY_URL=$CloudUrl"
 set "AI_ZOO_TERMINAL_ID=$TerminalId"
 set "AI_ZOO_FIELD_MODE=1"
-set "PATH=$nodeDirectory;$agentBin;%PATH%"
+set "PATH=$nodeDirectory;$agentBin;$WindowsSystemPath;%PATH%"
 "$NodeExe" build\write-build-info.js >> "$LogFile" 2>&1
 "$NodeExe" start.js >> "$LogFile" 2>&1
 "@
@@ -206,7 +214,7 @@ set "PATH=$nodeDirectory;$agentBin;%PATH%"
 
     $shell = New-Object -ComObject WScript.Shell
     $shortcut = $shell.CreateShortcut($StartupShortcut)
-    $shortcut.TargetPath = "$env:SystemRoot\System32\cmd.exe"
+    $shortcut.TargetPath = $WindowsCmdExe
     $shortcut.Arguments = "/c `"`"$RunnerFile`"`""
     $shortcut.WorkingDirectory = $AgentRoot
     $shortcut.WindowStyle = 7
@@ -238,7 +246,7 @@ try {
     $kioskUrl = Write-LaunchFiles -NodeExe $nodeExe -TerminalId $terminalId
 
     Write-Step "Starting the background print service and opening the kiosk..."
-    Start-Process -FilePath "$env:SystemRoot\System32\cmd.exe" -ArgumentList "/c", ('"{0}"' -f $RunnerFile) -WindowStyle Hidden
+    Start-Process -FilePath $WindowsCmdExe -ArgumentList "/c", ('"{0}"' -f $RunnerFile) -WindowStyle Hidden
     Start-Sleep -Seconds 5
     Start-Process $kioskUrl
 
