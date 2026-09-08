@@ -6,7 +6,8 @@ RUN npm ci
 COPY kiosk/ ./
 RUN npm run build
 
-FROM docker.1ms.run/library/php:8.2-fpm-bookworm
+# 1ms 的 PHP 镜像偶尔缺失 OCI 小层，导致 Zeabur 在缓存恢复阶段直接失败。
+FROM php:8.2-fpm-bookworm
 
 ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONDONTWRITEBYTECODE=1 \
