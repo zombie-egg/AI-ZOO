@@ -4,6 +4,7 @@ use think\facade\Route;
 
 Route::group('kiosk', function () {
     Route::get('scenes', 'Kiosk/scenes');
+    Route::get('printed-gallery', 'Kiosk/printedGallery');
     Route::post('create-order', 'Kiosk/createOrder');
     Route::post('order-scene/<id>', 'Kiosk/selectScene');
     Route::post('order-pose/<id>', 'Kiosk/selectPose');

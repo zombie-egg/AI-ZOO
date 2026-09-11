@@ -84,14 +84,25 @@ let flowTimer;
 const printedPhotos = ref([]);
 const printedGalleryKey = "ai-zoo-printed-gallery-v1";
 
-function loadPrintedGallery() {
+async function loadPrintedGallery() {
+  let localPhotos = [];
   try {
     const saved = JSON.parse(localStorage.getItem(printedGalleryKey) || "[]");
-    printedPhotos.value = Array.isArray(saved)
+    localPhotos = Array.isArray(saved)
       ? saved.filter((photo) => photo && typeof photo.src === "string").slice(0, 12)
       : [];
   } catch {
-    printedPhotos.value = [];
+    localPhotos = [];
+  }
+  try {
+    const remote = await kioskApi.getPrintedGallery();
+    const historical = Array.isArray(remote?.photos) ? remote.photos : [];
+    const merged = [...historical, ...localPhotos].filter(
+      (photo, index, all) => photo?.src && all.findIndex((item) => item.src === photo.src) === index,
+    );
+    printedPhotos.value = merged.slice(0, 12);
+  } catch {
+    printedPhotos.value = localPhotos;
   }
 }
 
@@ -628,7 +639,7 @@ watch(screen, (value) => {
 });
 
 onMounted(async () => {
-  loadPrintedGallery();
+  await loadPrintedGallery();
   connectPrintAgent((state) => {
     printerOnline.value = Boolean(state.online);
     printerStatusMessage.value = state.message || (state.online ? "相机与打印已就绪" : "打印服务未连接");
