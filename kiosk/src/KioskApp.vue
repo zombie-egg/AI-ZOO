@@ -111,6 +111,7 @@ function rememberPrintedPhoto() {
   const photo = {
     src: finalUrl.value,
     label: selectedScene.value?.title || "已打印合照",
+    scene_id: selectedScene.value?.scene_id || "",
     orderNo: order.value?.order_no || "",
     printedAt: new Date().toISOString(),
   };
@@ -123,9 +124,11 @@ function rememberPrintedPhoto() {
   }
 }
 
-function printedPhotoFor(index) {
-  if (!printedPhotos.value.length) return null;
-  return printedPhotos.value[index % printedPhotos.value.length];
+function printedPhotoForScene(sceneId) {
+  if (!sceneId) return null;
+  return printedPhotos.value.find(
+    (photo) => photo?.scene_id === sceneId || photo?.sceneId === sceneId,
+  ) || null;
 }
 
 const shotGuides = [
@@ -829,10 +832,10 @@ onBeforeUnmount(() => {
             @click="chooseScene(scene)"
           >
             <img
-              v-if="printedPhotoFor(index)"
+              v-if="printedPhotoForScene(scene.scene_id)"
               class="selection-card-photo"
-              :src="printedPhotoFor(index).src"
-              :alt="printedPhotoFor(index).label"
+              :src="printedPhotoForScene(scene.scene_id).src"
+              :alt="printedPhotoForScene(scene.scene_id).label"
               loading="lazy"
             />
             <b>{{ animalEmoji(scene.scene_id) }}</b
@@ -863,10 +866,10 @@ onBeforeUnmount(() => {
             @click="choosePose(pose)"
           >
             <img
-              v-if="printedPhotoFor(index)"
+              v-if="printedPhotoForScene(selectedScene?.scene_id)"
               class="selection-card-photo"
-              :src="printedPhotoFor(index).src"
-              :alt="printedPhotoFor(index).label"
+              :src="printedPhotoForScene(selectedScene?.scene_id).src"
+              :alt="printedPhotoForScene(selectedScene?.scene_id).label"
               loading="lazy"
             />
             <b>{{ pose.icon }}</b

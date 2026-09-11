@@ -58,6 +58,8 @@ class KioskLogic extends BaseLogic
                 $items[] = [
                     'src' => $url,
                     'label' => (string)($order->scene_id ?: '已打印合照'),
+                    'scene_id' => (string)$order->scene_id,
+                    'pose_id' => (string)$order->pose_id,
                     'order_no' => (string)$order->order_no,
                     'printed_at' => (int)($order->update_time ?: $order->create_time ?: 0),
                 ];
