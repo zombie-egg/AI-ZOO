@@ -11,6 +11,9 @@ server {
     location /kiosk/ {
         alias /var/www/kiosk/;
         try_files $uri $uri/ /kiosk/index.html;
+        # Kiosk tabs often stay open for days; always revalidate so a deployed
+        # layout cannot remain stuck on an older right-side gallery bundle.
+        add_header Cache-Control "no-cache, no-store, must-revalidate" always;
     }
 
     location /windows-client/ {
