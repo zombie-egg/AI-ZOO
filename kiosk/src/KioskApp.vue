@@ -100,7 +100,7 @@ async function loadPrintedGallery() {
     const merged = [...historical, ...localPhotos].filter(
       (photo, index, all) => photo?.src && all.findIndex((item) => item.src === photo.src) === index,
     );
-    printedPhotos.value = merged.slice(0, 12);
+    printedPhotos.value = merged.slice(0, 60);
   } catch {
     printedPhotos.value = localPhotos;
   }

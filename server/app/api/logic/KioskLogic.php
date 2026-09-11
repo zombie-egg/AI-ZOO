@@ -35,40 +35,11 @@ class KioskLogic extends BaseLogic
         ];
     }
 
-    /**
-     * Return only historical kiosk outputs whose local print callback was done.
-     * Generation URLs are freshly signed by ImageForge and no source/reference
-     * photos are exposed.
-     */
+    /** Return existing final outputs only; source/reference photos stay private. */
     public static function printedGallery(): array
     {
-        $orders = KioskOrder::where('print_status', 'done')
-            ->where('generation_id', '<>', '')
-            ->where('status', '<>', 'deleted')
-            ->order('id desc')
-            ->limit(12)
-            ->select();
-        $items = [];
-        $forge = new KioskImageForgeService();
-        foreach ($orders as $order) {
-            try {
-                $state = $forge->generationStatus((string)$order->generation_id);
-                $url = (string)($state['final_url'] ?? '');
-                if ($url === '') continue;
-                $items[] = [
-                    'src' => $url,
-                    'label' => (string)($order->scene_id ?: '已打印合照'),
-                    'scene_id' => (string)$order->scene_id,
-                    'pose_id' => (string)$order->pose_id,
-                    'order_no' => (string)$order->order_no,
-                    'printed_at' => (int)($order->update_time ?: $order->create_time ?: 0),
-                ];
-            } catch (\Throwable $ignored) {
-                // A stale/expired generation must not prevent other history
-                // from rendering.
-            }
-        }
-        return ['photos' => $items];
+        $gallery = (new KioskImageForgeService())->gallery(60);
+        return ['photos' => array_values((array)($gallery['photos'] ?? []))];
     }
 
     public static function createOrder(array $params, int $userId = 0): array

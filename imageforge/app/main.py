@@ -248,6 +248,36 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         require_internal_token(current, x_internal_token)
         return {"scenes": public_scenes(), "poses": public_poses()}
 
+    @app.get("/v4/gallery")
+    def generated_gallery(
+        limit: int = Query(default=60, ge=1, le=100),
+        x_internal_token: str | None = Header(default=None),
+    ) -> dict[str, Any]:
+        require_internal_token(current, x_internal_token)
+        jobs = service.db.all(
+            """SELECT * FROM generation_job
+            WHERE final_path IS NOT NULL AND final_path <> ''
+              AND status IN ('review_required', 'done')
+            ORDER BY created_at DESC LIMIT ?""",
+            (limit,),
+        )
+        photos = []
+        for job in jobs:
+            final_path = Path(job["final_path"])
+            if not final_path.is_file():
+                continue
+            photos.append(
+                {
+                    "src": signed_delivery_url(current, job["id"], final_path.name),
+                    "label": job["scene_id"],
+                    "scene_id": job["scene_id"],
+                    "pose_id": job["pose_id"],
+                    "order_no": job["order_no"],
+                    "created_at": job["created_at"],
+                }
+            )
+        return {"photos": photos}
+
     @app.post("/v4/generations")
     def create_generation(
         payload: DirectGenerationRequest,

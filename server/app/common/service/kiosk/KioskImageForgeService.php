@@ -50,6 +50,12 @@ class KioskImageForgeService
         return (array)($this->catalog()['poses'] ?? []);
     }
 
+    public function gallery(int $limit = 60): array
+    {
+        $limit = max(1, min(100, $limit));
+        return $this->request('GET', '/v4/gallery?limit=' . $limit);
+    }
+
     public function generate(string $orderNo, string $sceneId, string $poseId, array $participants, string $sku): array
     {
         return $this->request('POST', '/v4/generations', [
