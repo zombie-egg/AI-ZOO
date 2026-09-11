@@ -609,15 +609,21 @@ button, a { letter-spacing: .065em; }
 .selection-layout .pose-option-grid { margin-bottom: 32px; }
 .scene-option-grid button,
 .pose-option-grid button { position: relative; overflow: hidden; }
-.scene-option-grid button:has(.selection-card-photo) { padding-right: 116px; }
-.pose-option-grid button:has(.selection-card-photo) { padding-right: 112px; }
+.scene-option-grid button:has(.selection-card-photo) { padding-right: calc(34% + 28px); }
+.pose-option-grid button:has(.selection-card-photo) {
+  align-items: start;
+  justify-items: start;
+  padding-right: calc(34% + 28px);
+  text-align: left;
+}
 .selection-card-photo {
   position: absolute;
   z-index: 0;
-  top: 14px;
-  right: 14px;
-  width: 82px;
-  height: 82px;
+  top: 12px;
+  right: 12px;
+  bottom: 12px;
+  width: 34%;
+  height: calc(100% - 24px);
   border: 1px solid rgba(0,0,0,.16);
   border-radius: 14px;
   object-fit: cover;

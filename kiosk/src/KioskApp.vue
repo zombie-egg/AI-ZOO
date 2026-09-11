@@ -79,56 +79,22 @@ const heroTitle = "AI ZOO".split("");
 let inactivityTimer;
 let flowTimer;
 
-// The wall is local to this kiosk browser and only contains photos whose
-// print job was acknowledged as done. No stock or placeholder images appear.
-const printedPhotos = ref([]);
-const printedGalleryKey = "ai-zoo-printed-gallery-v1";
-
-async function loadPrintedGallery() {
-  let localPhotos = [];
-  try {
-    const saved = JSON.parse(localStorage.getItem(printedGalleryKey) || "[]");
-    localPhotos = Array.isArray(saved)
-      ? saved.filter((photo) => photo && typeof photo.src === "string").slice(0, 12)
-      : [];
-  } catch {
-    localPhotos = [];
-  }
-  try {
-    const remote = await kioskApi.getPrintedGallery();
-    const historical = Array.isArray(remote?.photos) ? remote.photos : [];
-    const merged = [...historical, ...localPhotos].filter(
-      (photo, index, all) => photo?.src && all.findIndex((item) => item.src === photo.src) === index,
-    );
-    printedPhotos.value = merged.slice(0, 60);
-  } catch {
-    printedPhotos.value = localPhotos;
-  }
-}
-
-function rememberPrintedPhoto() {
-  if (!finalUrl.value) return;
-  const photo = {
-    src: finalUrl.value,
-    label: selectedScene.value?.title || "已打印合照",
-    scene_id: selectedScene.value?.scene_id || "",
-    orderNo: order.value?.order_no || "",
-    printedAt: new Date().toISOString(),
-  };
-  const next = [photo, ...printedPhotos.value.filter((item) => item.src !== photo.src)].slice(0, 12);
-  printedPhotos.value = next;
-  try {
-    localStorage.setItem(printedGalleryKey, JSON.stringify(next));
-  } catch {
-    // Storage quota/private mode must not interrupt the print flow.
-  }
-}
+// Curated once from the existing ImageForge output database. These fixed
+// assets never rotate when new customer photos are generated.
+const fixedScenePhotos = Object.freeze({
+  PANDA_CASUAL_01: { src: "/kiosk/card-gallery/panda.jpg", label: "熊猫场景成品" },
+  RED_PANDA_VIEW_01: { src: "/kiosk/card-gallery/red-panda.jpg", label: "小熊猫场景成品" },
+  ELEPHANT_WALK_01: { src: "/kiosk/card-gallery/elephant.jpg", label: "大象场景成品" },
+  GIRAFFE_WINDOW_01: { src: "/kiosk/card-gallery/giraffe.jpg", label: "长颈鹿场景成品" },
+  FLAMINGO_LAGOON_01: { src: "/kiosk/card-gallery/flamingo.jpg", label: "火烈鸟场景成品" },
+  DOLPHIN_WINDOW_01: { src: "/kiosk/card-gallery/dolphin.jpg", label: "海豚场景成品" },
+  LEMUR_HABITAT_01: { src: "/kiosk/card-gallery/lemur.jpg", label: "狐猴场景成品" },
+  WHITE_TIGER_GLASS_01: { src: "/kiosk/card-gallery/white-tiger.jpg", label: "白虎场景成品" },
+  CAPYBARA_LAWN_01: { src: "/kiosk/card-gallery/capybara.jpg", label: "水豚场景成品" },
+});
 
 function printedPhotoForScene(sceneId) {
-  if (!sceneId) return null;
-  return printedPhotos.value.find(
-    (photo) => photo?.scene_id === sceneId || photo?.sceneId === sceneId,
-  ) || null;
+  return fixedScenePhotos[sceneId] || null;
 }
 
 const shotGuides = [
@@ -603,7 +569,6 @@ async function beginPrinting() {
     progress.value = 100;
     deliveryPrinted.value = true;
     await kioskApi.reportPrintStatus(order.value.id, "done");
-    rememberPrintedPhoto();
     await finishResult();
   } catch (error) {
     clearFlowTimer();
@@ -642,7 +607,6 @@ watch(screen, (value) => {
 });
 
 onMounted(async () => {
-  await loadPrintedGallery();
   connectPrintAgent((state) => {
     printerOnline.value = Boolean(state.online);
     printerStatusMessage.value = state.message || (state.online ? "相机与打印已就绪" : "打印服务未连接");
@@ -826,7 +790,7 @@ onBeforeUnmount(() => {
       <div class="selection-layout">
         <div class="scene-option-grid">
           <button
-            v-for="(scene, index) in scenes"
+            v-for="scene in scenes"
             :key="scene.scene_id"
             :disabled="busy"
             @click="chooseScene(scene)"
@@ -860,7 +824,7 @@ onBeforeUnmount(() => {
       <div class="selection-layout pose-selection-layout">
         <div class="pose-option-grid">
           <button
-            v-for="(pose, index) in poses"
+            v-for="pose in poses"
             :key="pose.pose_id"
             :disabled="busy"
             @click="choosePose(pose)"
