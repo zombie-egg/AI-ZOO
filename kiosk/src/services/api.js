@@ -15,6 +15,7 @@ async function request(path, options = {}) {
 
 export const kioskApi = {
   getScenes() { return request('/api/kiosk/scenes') },
+  getPrintedGallery() { return request('/api/kiosk/printed-gallery') },
   createOrder(data) {
     return request('/api/kiosk/create-order', {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data),
