@@ -6,6 +6,7 @@ const os = require("os");
 const fs = require("fs");
 const { printPdf, printPdfBlob } = require("./pdf-print");
 const { printSelphyDirect } = require("./selphy-direct");
+const { applyPaperProfile } = require("./paper-profile");
 const { store, getCurrentPrintStatusByName } = require("../tools/utils");
 const db = require("../tools/database");
 const dayjs = require("dayjs");
@@ -105,6 +106,16 @@ function initPrintEvent() {
       return;
     }
     let deviceName = defaultPrinter;
+    // On Windows the Canon CP1500 driver exposes the media currently selected
+    // for its loaded cassette. Resolve it immediately before every job so a
+    // changed L/postcard/card pack never inherits the previous job's 89×119mm
+    // page settings.
+    const detectedPaper = applyPaperProfile(data, deviceName);
+    if (detectedPaper.profile) {
+      console.log(
+        `打印任务 ${data.templateId || ""} 使用 ${detectedPaper.profile.label}（${detectedPaper.source}）`,
+      );
+    }
 
     const logPrintResult = (status, errorMessage = "") => {
       db.run(

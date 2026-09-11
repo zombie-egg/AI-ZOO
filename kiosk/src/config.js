@@ -8,7 +8,9 @@ export const kioskConfig = Object.freeze({
   printerName: env.VITE_PHOTO_PRINTER_NAME ?? 'Canon_SELPHY_CP1500',
   printPageWidthMm: Number(env.VITE_PRINT_PAGE_WIDTH_MM ?? 89),
   printPageHeightMm: Number(env.VITE_PRINT_PAGE_HEIGHT_MM ?? 119),
-  cameraLabel: env.VITE_CAMERA_DEVICE_LABEL ?? '1200W Camera',
+  // DECXIN is the field camera. camera.js also recognises common UVC aliases so
+  // replacing the USB camera does not require a kiosk rebuild.
+  cameraLabel: env.VITE_CAMERA_DEVICE_LABEL ?? 'DECXIN',
   price: 9.9,
   inactivityMs: Number(env.VITE_INACTIVITY_MS ?? 5 * 60 * 1000),
 })

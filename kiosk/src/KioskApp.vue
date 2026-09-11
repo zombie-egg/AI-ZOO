@@ -79,6 +79,13 @@ const heroTitle = "AI ZOO".split("");
 let inactivityTimer;
 let flowTimer;
 
+const inspirationPhotos = [
+  { src: "/kiosk/animal-gallery/panda-bench.png", label: "熊猫馆" },
+  { src: "/kiosk/animal-gallery/red-panda-hug.png", label: "小熊猫展区" },
+  { src: "/kiosk/animal-gallery/elephant-walk.png", label: "大象步道" },
+  { src: "/kiosk/animal-gallery/giraffe-close.png", label: "长颈鹿窗边" },
+];
+
 const shotGuides = [
   {
     type: "body_anchor",
@@ -769,18 +776,33 @@ onBeforeUnmount(() => {
         <h2>想拍什么样的合照？</h2>
         <span>每个选项对应一份固定长 Prompt</span>
       </div>
-      <div class="scene-option-grid">
-        <button
-          v-for="scene in scenes"
-          :key="scene.scene_id"
-          :disabled="busy"
-          @click="chooseScene(scene)"
-        >
-          <b>{{ animalEmoji(scene.scene_id) }}</b
-          ><strong>{{ scene.title }}</strong
-          ><span>{{ scene.description }}</span
-          ><small>{{ scene.prompt_version }}</small>
-        </button>
+      <div class="selection-layout">
+        <div class="scene-option-grid">
+          <button
+            v-for="scene in scenes"
+            :key="scene.scene_id"
+            :disabled="busy"
+            @click="chooseScene(scene)"
+          >
+            <b>{{ animalEmoji(scene.scene_id) }}</b
+            ><strong>{{ scene.title }}</strong
+            ><span>{{ scene.description }}</span
+            ><small>{{ scene.prompt_version }}</small>
+          </button>
+        </div>
+        <aside class="inspiration-wall" aria-label="动物合照灵感示例">
+          <p>动物合照灵感</p>
+          <strong>下一张
+            <em>也会在这里诞生</em>
+          </strong>
+          <div class="inspiration-grid">
+            <figure v-for="photo in inspirationPhotos" :key="photo.src">
+              <img :src="photo.src" :alt="photo.label" loading="lazy" />
+              <figcaption>{{ photo.label }}</figcaption>
+            </figure>
+          </div>
+          <span>每次都按本人照片重新生成</span>
+        </aside>
       </div>
     </section>
 
@@ -794,18 +816,33 @@ onBeforeUnmount(() => {
           {{ selectedScene?.title }}</span
         >
       </div>
-      <div class="pose-option-grid">
-        <button
-          v-for="pose in poses"
-          :key="pose.pose_id"
-          :disabled="busy"
-          @click="choosePose(pose)"
-        >
-          <b>{{ pose.icon }}</b
-          ><strong>{{ pose.title }}</strong
-          ><span>{{ pose.description }}</span
-          ><small>自动匹配构图 · 强化瘦脸美颜</small>
-        </button>
+      <div class="selection-layout pose-selection-layout">
+        <div class="pose-option-grid">
+          <button
+            v-for="pose in poses"
+            :key="pose.pose_id"
+            :disabled="busy"
+            @click="choosePose(pose)"
+          >
+            <b>{{ pose.icon }}</b
+            ><strong>{{ pose.title }}</strong
+            ><span>{{ pose.description }}</span
+            ><small>自动匹配构图 · 自然保留本人五官</small>
+          </button>
+        </div>
+        <aside class="inspiration-wall pose-inspiration-wall" aria-label="已生成照片示例">
+          <p>自然构图示例</p>
+          <strong>选好朝向
+            <em>AI 会自动协调姿势</em>
+          </strong>
+          <div class="inspiration-grid pose-inspiration-grid">
+            <figure v-for="photo in inspirationPhotos.slice(0, 3)" :key="photo.src">
+              <img :src="photo.src" :alt="photo.label" loading="lazy" />
+              <figcaption>{{ photo.label }}</figcaption>
+            </figure>
+          </div>
+          <span>保持本人身份、发型与穿搭</span>
+        </aside>
       </div>
       <p class="pose-note">
         “背影”采用自然回眸：身体面向动物，脸部保留可识别角度，美白、磨皮、瘦脸仍会完整执行。
