@@ -112,6 +112,11 @@ function rememberPrintedPhoto() {
   }
 }
 
+function printedPhotoFor(index) {
+  if (!printedPhotos.value.length) return null;
+  return printedPhotos.value[index % printedPhotos.value.length];
+}
+
 const shotGuides = [
   {
     type: "body_anchor",
@@ -807,30 +812,24 @@ onBeforeUnmount(() => {
       <div class="selection-layout">
         <div class="scene-option-grid">
           <button
-            v-for="scene in scenes"
+            v-for="(scene, index) in scenes"
             :key="scene.scene_id"
             :disabled="busy"
             @click="chooseScene(scene)"
           >
+            <img
+              v-if="printedPhotoFor(index)"
+              class="selection-card-photo"
+              :src="printedPhotoFor(index).src"
+              :alt="printedPhotoFor(index).label"
+              loading="lazy"
+            />
             <b>{{ animalEmoji(scene.scene_id) }}</b
             ><strong>{{ scene.title }}</strong
             ><span>{{ scene.description }}</span
             ><small>{{ scene.prompt_version }}</small>
           </button>
         </div>
-        <aside class="inspiration-wall" aria-label="动物合照灵感示例">
-          <p>动物合照灵感</p>
-          <strong>下一张
-            <em>也会在这里诞生</em>
-          </strong>
-          <div v-if="printedPhotos.length" class="inspiration-grid">
-            <figure v-for="photo in printedPhotos" :key="photo.src + photo.printedAt">
-              <img :src="photo.src" :alt="photo.label" loading="lazy" />
-              <figcaption>{{ photo.label }}</figcaption>
-            </figure>
-          </div>
-          <span v-else class="inspiration-empty">完成打印后，照片会显示在这里</span>
-        </aside>
       </div>
     </section>
 
@@ -847,30 +846,24 @@ onBeforeUnmount(() => {
       <div class="selection-layout pose-selection-layout">
         <div class="pose-option-grid">
           <button
-            v-for="pose in poses"
+            v-for="(pose, index) in poses"
             :key="pose.pose_id"
             :disabled="busy"
             @click="choosePose(pose)"
           >
+            <img
+              v-if="printedPhotoFor(index)"
+              class="selection-card-photo"
+              :src="printedPhotoFor(index).src"
+              :alt="printedPhotoFor(index).label"
+              loading="lazy"
+            />
             <b>{{ pose.icon }}</b
             ><strong>{{ pose.title }}</strong
             ><span>{{ pose.description }}</span
             ><small>自动匹配构图 · 自然保留本人五官</small>
           </button>
         </div>
-        <aside class="inspiration-wall pose-inspiration-wall" aria-label="已生成照片示例">
-          <p>自然构图示例</p>
-          <strong>选好朝向
-            <em>AI 会自动协调姿势</em>
-          </strong>
-          <div v-if="printedPhotos.length" class="inspiration-grid pose-inspiration-grid">
-            <figure v-for="photo in printedPhotos.slice(0, 6)" :key="photo.src + photo.printedAt">
-              <img :src="photo.src" :alt="photo.label" loading="lazy" />
-              <figcaption>{{ photo.label }}</figcaption>
-            </figure>
-          </div>
-          <span v-else class="inspiration-empty">完成打印后，照片会显示在这里</span>
-        </aside>
       </div>
       <p class="pose-note">
         “背影”采用自然回眸：身体面向动物，脸部保留可识别角度，美白、磨皮、瘦脸仍会完整执行。

@@ -602,12 +602,37 @@ button, a { letter-spacing: .065em; }
    option list. Turn it into a real photo wall instead of a blank white area. */
 .selection-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(230px, .38fr);
+  grid-template-columns: minmax(0, 1fr);
   align-items: start;
-  gap: clamp(24px, 3vw, 56px);
 }
 .selection-layout .scene-option-grid,
 .selection-layout .pose-option-grid { margin-bottom: 32px; }
+.scene-option-grid button,
+.pose-option-grid button { position: relative; overflow: hidden; }
+.scene-option-grid button:has(.selection-card-photo) { padding-right: 116px; }
+.pose-option-grid button:has(.selection-card-photo) { padding-right: 112px; }
+.selection-card-photo {
+  position: absolute;
+  z-index: 0;
+  top: 14px;
+  right: 14px;
+  width: 82px;
+  height: 82px;
+  border: 1px solid rgba(0,0,0,.16);
+  border-radius: 14px;
+  object-fit: cover;
+  opacity: .88;
+  box-shadow: 0 8px 20px rgba(0,0,0,.12);
+  pointer-events: none;
+}
+.scene-option-grid button > b,
+.scene-option-grid button > strong,
+.scene-option-grid button > span,
+.scene-option-grid button > small,
+.pose-option-grid button > b,
+.pose-option-grid button > strong,
+.pose-option-grid button > span,
+.pose-option-grid button > small { position: relative; z-index: 1; }
 .inspiration-wall {
   position: sticky;
   top: 116px;
