@@ -12,13 +12,11 @@ if not exist "%AI_ZOO_POWERSHELL%" goto powershell_missing
 set "SETUP_SCRIPT=%~dp0setup-windows.ps1"
 set "DOWNLOADED_SCRIPT=%TEMP%\AI-ZOO-setup-windows.ps1"
 
-if exist "%SETUP_SCRIPT%" goto run_setup
-
 echo [AI ZOO] Downloading the Windows one-click installer...
 "%AI_ZOO_POWERSHELL%" -NoLogo -NoProfile -ExecutionPolicy Bypass -Command ^
   "[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -UseBasicParsing 'https://ai-zoo-zombie.zeabur.app/windows-client/setup-windows.ps1' -OutFile '%DOWNLOADED_SCRIPT%'"
-if errorlevel 1 goto download_failed
-set "SETUP_SCRIPT=%DOWNLOADED_SCRIPT%"
+if not errorlevel 1 set "SETUP_SCRIPT=%DOWNLOADED_SCRIPT%"
+if not exist "%SETUP_SCRIPT%" goto download_failed
 
 :run_setup
 "%AI_ZOO_POWERSHELL%" -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%SETUP_SCRIPT%"

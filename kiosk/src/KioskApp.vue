@@ -79,12 +79,38 @@ const heroTitle = "AI ZOO".split("");
 let inactivityTimer;
 let flowTimer;
 
-const inspirationPhotos = [
-  { src: "/kiosk/animal-gallery/panda-bench.png", label: "熊猫馆" },
-  { src: "/kiosk/animal-gallery/red-panda-hug.png", label: "小熊猫展区" },
-  { src: "/kiosk/animal-gallery/elephant-walk.png", label: "大象步道" },
-  { src: "/kiosk/animal-gallery/giraffe-close.png", label: "长颈鹿窗边" },
-];
+// The wall is local to this kiosk browser and only contains photos whose
+// print job was acknowledged as done. No stock or placeholder images appear.
+const printedPhotos = ref([]);
+const printedGalleryKey = "ai-zoo-printed-gallery-v1";
+
+function loadPrintedGallery() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(printedGalleryKey) || "[]");
+    printedPhotos.value = Array.isArray(saved)
+      ? saved.filter((photo) => photo && typeof photo.src === "string").slice(0, 12)
+      : [];
+  } catch {
+    printedPhotos.value = [];
+  }
+}
+
+function rememberPrintedPhoto() {
+  if (!finalUrl.value) return;
+  const photo = {
+    src: finalUrl.value,
+    label: selectedScene.value?.title || "已打印合照",
+    orderNo: order.value?.order_no || "",
+    printedAt: new Date().toISOString(),
+  };
+  const next = [photo, ...printedPhotos.value.filter((item) => item.src !== photo.src)].slice(0, 12);
+  printedPhotos.value = next;
+  try {
+    localStorage.setItem(printedGalleryKey, JSON.stringify(next));
+  } catch {
+    // Storage quota/private mode must not interrupt the print flow.
+  }
+}
 
 const shotGuides = [
   {
@@ -558,6 +584,7 @@ async function beginPrinting() {
     progress.value = 100;
     deliveryPrinted.value = true;
     await kioskApi.reportPrintStatus(order.value.id, "done");
+    rememberPrintedPhoto();
     await finishResult();
   } catch (error) {
     clearFlowTimer();
@@ -596,6 +623,7 @@ watch(screen, (value) => {
 });
 
 onMounted(async () => {
+  loadPrintedGallery();
   connectPrintAgent((state) => {
     printerOnline.value = Boolean(state.online);
     printerStatusMessage.value = state.message || (state.online ? "相机与打印已就绪" : "打印服务未连接");
@@ -795,13 +823,13 @@ onBeforeUnmount(() => {
           <strong>下一张
             <em>也会在这里诞生</em>
           </strong>
-          <div class="inspiration-grid">
-            <figure v-for="photo in inspirationPhotos" :key="photo.src">
+          <div v-if="printedPhotos.length" class="inspiration-grid">
+            <figure v-for="photo in printedPhotos" :key="photo.src + photo.printedAt">
               <img :src="photo.src" :alt="photo.label" loading="lazy" />
               <figcaption>{{ photo.label }}</figcaption>
             </figure>
           </div>
-          <span>每次都按本人照片重新生成</span>
+          <span v-else class="inspiration-empty">完成打印后，照片会显示在这里</span>
         </aside>
       </div>
     </section>
@@ -835,13 +863,13 @@ onBeforeUnmount(() => {
           <strong>选好朝向
             <em>AI 会自动协调姿势</em>
           </strong>
-          <div class="inspiration-grid pose-inspiration-grid">
-            <figure v-for="photo in inspirationPhotos.slice(0, 3)" :key="photo.src">
+          <div v-if="printedPhotos.length" class="inspiration-grid pose-inspiration-grid">
+            <figure v-for="photo in printedPhotos.slice(0, 6)" :key="photo.src + photo.printedAt">
               <img :src="photo.src" :alt="photo.label" loading="lazy" />
               <figcaption>{{ photo.label }}</figcaption>
             </figure>
           </div>
-          <span>保持本人身份、发型与穿搭</span>
+          <span v-else class="inspiration-empty">完成打印后，照片会显示在这里</span>
         </aside>
       </div>
       <p class="pose-note">

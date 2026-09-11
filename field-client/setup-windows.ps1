@@ -6,13 +6,15 @@ $ProgressPreference = "SilentlyContinue"
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
 $CloudUrl = "https://ai-zoo-zombie.zeabur.app"
-$AgentArchiveUrl = "$CloudUrl/windows-client/print-agent.zip"
+$AgentRelease = "2026.09.11.2"
+$AgentArchiveUrl = "$CloudUrl/windows-client/print-agent.zip?release=$AgentRelease"
 $InstallRoot = Join-Path $env:LOCALAPPDATA "AI-ZOO"
 $RuntimeRoot = Join-Path $InstallRoot "runtime"
 $AgentRoot = Join-Path $InstallRoot "print-agent"
 $TerminalFile = Join-Path $InstallRoot "terminal-id.txt"
 $RunnerFile = Join-Path $InstallRoot "run-print-agent.cmd"
 $LogFile = Join-Path $InstallRoot "print-agent.log"
+$AgentReleaseFile = Join-Path $InstallRoot "print-agent-release.txt"
 $StartupFolder = [Environment]::GetFolderPath("Startup")
 $DesktopFolder = [Environment]::GetFolderPath("Desktop")
 $StartupShortcut = Join-Path $StartupFolder "AI-ZOO-Print-Agent.lnk"
@@ -148,7 +150,23 @@ function Install-PortableNode {
 
 function Install-PrintAgent([string]$NodeExe) {
     $electronCommand = Join-Path $AgentRoot "node_modules\.bin\electron.cmd"
-    if (Test-Path $electronCommand) { return }
+    $installedRelease = if (Test-Path $AgentReleaseFile) { (Get-Content $AgentReleaseFile -Raw).Trim() } else { "" }
+    if ((Test-Path $electronCommand) -and $installedRelease -eq $AgentRelease) { return }
+
+    if (Test-Path $electronCommand) {
+        Write-Step "Updating the AI ZOO Windows print service to release $AgentRelease..."
+        # Electron keeps files open while the field agent is running. Stop only
+        # processes whose command line belongs to this AI ZOO print-agent folder.
+        try {
+            $agentPattern = [regex]::Escape($AgentRoot)
+            Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
+                Where-Object { $_.CommandLine -and $_.CommandLine -match $agentPattern } |
+                ForEach-Object { Invoke-CimMethod -InputObject $_ -MethodName Terminate -ErrorAction SilentlyContinue | Out-Null }
+            Start-Sleep -Seconds 2
+        } catch {
+            Write-Warning "The previous print service could not be stopped automatically; continuing with the update."
+        }
+    }
 
     Write-Step "Downloading and installing the AI ZOO Windows print service..."
     $sourceArchive = Join-Path $env:TEMP "AI-ZOO-print-agent.zip"
@@ -196,6 +214,7 @@ function Install-PrintAgent([string]$NodeExe) {
     }
 
     if (-not (Test-Path $electronCommand)) { throw "Electron print service installation is incomplete." }
+    Set-Content -Path $AgentReleaseFile -Value $AgentRelease -NoNewline -Encoding Ascii
 }
 
 function Get-TerminalId {
