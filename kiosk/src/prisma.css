@@ -754,6 +754,7 @@ button, a { letter-spacing: .065em; }
 .prisma-nav-status { color: #111 !important; }
 .prisma-nav-status i { background: #111; box-shadow: 0 0 13px rgba(17,17,17,.3); }
 .prisma-title { color: #111; }
+.prisma-title span { animation: none; opacity: 1; transform: none; }
 .prisma-side p, .prisma-side small { color: rgba(17,17,17,.7); }
 .prisma-start { color: #fff; background: #111; box-shadow: 0 15px 32px rgba(17,17,17,.16); }
 .prisma-start b { color: #111; background: #fff; }
