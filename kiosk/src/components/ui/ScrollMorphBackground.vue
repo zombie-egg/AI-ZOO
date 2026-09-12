@@ -5,8 +5,8 @@ defineProps({
   muted: { type: Boolean, default: false },
 });
 
-// Only use finished photos already stored in the project database. Repetition
-// is intentional so the ring remains continuous on wide kiosk screens.
+// Existing, curated database outputs only. Each track is duplicated in the
+// template so the vertical waterfall can loop without a visible seam.
 const sourceImages = [
   ["/kiosk/card-gallery/panda.jpg", "熊猫"],
   ["/kiosk/card-gallery/red-panda.jpg", "小熊猫"],
@@ -19,34 +19,32 @@ const sourceImages = [
   ["/kiosk/card-gallery/capybara.jpg", "水豚"],
 ];
 
-const cards = computed(() =>
-  Array.from({ length: 20 }, (_, index) => {
-    const [src, label] = sourceImages[index % sourceImages.length];
-    return {
-      src,
-      label,
-      angle: `${(index / 20) * 360}deg`,
-    };
-  }),
-);
+const leftTrack = computed(() => [...sourceImages, ...sourceImages]);
+const rightTrack = computed(() => {
+  const reversed = [...sourceImages].reverse();
+  return [...reversed, ...reversed];
+});
 </script>
 
 <template>
   <div class="scroll-morph-backdrop" :class="{ 'is-muted': muted }" aria-hidden="true">
-    <div class="scroll-morph-wash"></div>
-    <div class="scroll-morph-stage">
-      <div class="scroll-morph-ring">
-        <div
-          v-for="card in cards"
-          :key="`${card.src}-${card.angle}`"
-          class="scroll-morph-card"
-          :style="{ '--card-angle': card.angle }"
-        >
-          <img :src="card.src" :alt="card.label" loading="eager" />
+    <div class="scroll-morph-gallery">
+      <div class="scroll-morph-column scroll-morph-column-left">
+        <div class="scroll-morph-track">
+          <figure v-for="(photo, index) in leftTrack" :key="`left-${index}`" class="scroll-morph-photo">
+            <img :src="photo[0]" :alt="photo[1]" loading="eager" />
+          </figure>
+        </div>
+      </div>
+      <div class="scroll-morph-column scroll-morph-column-right">
+        <div class="scroll-morph-track">
+          <figure v-for="(photo, index) in rightTrack" :key="`right-${index}`" class="scroll-morph-photo">
+            <img :src="photo[0]" :alt="photo[1]" loading="eager" />
+          </figure>
         </div>
       </div>
     </div>
-    <div class="scroll-morph-caption">AI ZOO · 已完成成品影像</div>
+    <div class="scroll-morph-center-wash"></div>
   </div>
 </template>
 
@@ -61,66 +59,78 @@ const cards = computed(() =>
   background: var(--morph-paper);
 }
 .scroll-morph-backdrop.is-muted { --morph-paper: #f3f3ef; }
-.scroll-morph-stage {
+.scroll-morph-gallery {
   position: absolute;
   inset: 0;
   display: grid;
-  place-items: center;
-  perspective: 1200px;
+  grid-template-columns: minmax(108px, 19vw) minmax(108px, 19vw);
+  justify-content: space-between;
+  gap: clamp(18px, 5vw, 76px);
+  padding: 0 clamp(18px, 4vw, 76px);
 }
-.scroll-morph-ring {
+.scroll-morph-column {
   position: relative;
-  width: min(76vw, 900px);
-  height: min(76vw, 900px);
-  transform: translateZ(0);
-  animation: ring-spin 34s linear infinite;
+  height: 100%;
+  overflow: hidden;
+}
+.scroll-morph-column-right { padding-top: clamp(56px, 12vh, 150px); }
+.scroll-morph-track {
+  display: grid;
+  gap: clamp(12px, 1.5vw, 24px);
+  padding: clamp(18px, 3vh, 42px) 0;
+  animation: waterfall-up 46s linear infinite;
   will-change: transform;
 }
-.scroll-morph-wash {
+.scroll-morph-column-right .scroll-morph-track {
+  animation-name: waterfall-down;
+  animation-duration: 53s;
+  animation-delay: -17s;
+}
+.scroll-morph-photo {
+  width: 100%;
+  height: clamp(156px, 22vh, 290px);
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid rgba(12,18,16,.2);
+  border-radius: clamp(14px, 1.5vw, 24px);
+  background: #e8e9e5;
+  box-shadow: 0 14px 34px rgba(12,18,16,.14);
+}
+.scroll-morph-photo img { width: 100%; height: 100%; object-fit: cover; }
+.scroll-morph-backdrop.is-muted .scroll-morph-photo { opacity: .84; }
+.scroll-morph-center-wash {
   position: absolute;
   z-index: 2;
   inset: 0;
   background:
-    radial-gradient(circle at 50% 50%, rgba(255,255,255,.54), rgba(255,255,255,.14) 46%, rgba(255,255,255,.5) 100%),
-    linear-gradient(115deg, rgba(229,240,255,.2), transparent 42%, rgba(255,226,204,.2));
+    linear-gradient(90deg, rgba(255,255,255,.05) 0%, rgba(255,255,255,.58) 18%, rgba(255,255,255,.88) 34%, rgba(255,255,255,.92) 50%, rgba(255,255,255,.88) 66%, rgba(255,255,255,.58) 82%, rgba(255,255,255,.05) 100%),
+    linear-gradient(180deg, rgba(255,255,255,.22), transparent 24%, transparent 76%, rgba(255,255,255,.28));
 }
-.scroll-morph-card {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: clamp(64px, 7vw, 102px);
-  height: clamp(92px, 10vw, 142px);
-  overflow: hidden;
-  border: 1px solid rgba(12, 18, 16, .28);
-  border-radius: 14px;
-  background: #e8e9e5;
-  box-shadow: 0 14px 34px rgba(12,18,16,.2);
-  transform: rotate(var(--card-angle)) translateY(calc(min(38vw, 450px) * -1));
-  transform-origin: center center;
+@keyframes waterfall-up {
+  from { transform: translateY(0); }
+  to { transform: translateY(-50%); }
 }
-.scroll-morph-card img { width: 100%; height: 100%; object-fit: cover; }
-.scroll-morph-backdrop.is-muted .scroll-morph-card { opacity: .86; }
-.scroll-morph-caption {
-  position: absolute;
-  z-index: 3;
-  right: 20px;
-  bottom: 16px;
-  color: rgba(17,17,17,.42);
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: .16em;
-  text-transform: uppercase;
-}
-@keyframes ring-spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+@keyframes waterfall-down {
+  from { transform: translateY(-50%); }
+  to { transform: translateY(0); }
 }
 @media (prefers-reduced-motion: reduce) {
-  .scroll-morph-ring { animation-duration: 90s; }
+  .scroll-morph-track { animation-duration: 120s; }
 }
 @media (max-width: 700px) {
-  .scroll-morph-ring { width: 94vw; height: 94vw; }
-  .scroll-morph-card { transform: rotate(var(--card-angle)) translateY(-44vw); }
-  .scroll-morph-caption { right: 12px; bottom: 10px; font-size: 8px; }
+  .scroll-morph-gallery {
+    grid-template-columns: minmax(76px, 25vw) minmax(76px, 25vw);
+    gap: 8px;
+    padding: 0 8px;
+  }
+  .scroll-morph-photo {
+    height: clamp(112px, 17vh, 190px);
+    border-radius: 12px;
+  }
+  .scroll-morph-column-right { padding-top: 9vh; }
+  .scroll-morph-track { gap: 8px; padding: 10px 0; }
+  .scroll-morph-center-wash {
+    background: linear-gradient(90deg, rgba(255,255,255,.05), rgba(255,255,255,.82) 24%, rgba(255,255,255,.92) 50%, rgba(255,255,255,.82) 76%, rgba(255,255,255,.05));
+  }
 }
 </style>
