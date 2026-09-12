@@ -9,7 +9,6 @@ import {
 } from "vue";
 import QRCode from "qrcode";
 import { ArrowRight } from "lucide-vue-next";
-import ScrollMorphBackground from "./components/ui/ScrollMorphBackground.vue";
 import InfiniteGrid from "./components/ui/InfiniteGrid.vue";
 import { kioskConfig } from "./config";
 import { kioskApi } from "./services/api";
@@ -635,8 +634,7 @@ onBeforeUnmount(() => {
 
 <template>
   <main class="kiosk-shell" :data-screen="screen">
-    <ScrollMorphBackground v-if="screen === 'idle'" />
-    <InfiniteGrid v-else />
+    <InfiniteGrid v-if="screen !== 'idle'" />
     <header v-if="screen !== 'idle'" class="topbar">
       <div class="brand-mark">AI</div>
       <div>
@@ -647,6 +645,14 @@ onBeforeUnmount(() => {
     </header>
 
     <section v-if="screen === 'idle'" class="prisma-hero">
+      <video
+        class="prisma-video"
+        autoplay
+        loop
+        muted
+        playsinline
+        src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260405_170732_8a9ccda6-5cff-4628-b164-059c500a2b41.mp4"
+      ></video>
       <div class="prisma-noise"></div>
       <div class="prisma-video-shade"></div>
       <nav class="prisma-nav">
