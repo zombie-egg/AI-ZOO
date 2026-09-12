@@ -10,6 +10,7 @@ import {
 import QRCode from "qrcode";
 import { ArrowRight } from "lucide-vue-next";
 import ScrollMorphBackground from "./components/ui/ScrollMorphBackground.vue";
+import InfiniteGrid from "./components/ui/InfiniteGrid.vue";
 import { kioskConfig } from "./config";
 import { kioskApi } from "./services/api";
 import {
@@ -634,7 +635,8 @@ onBeforeUnmount(() => {
 
 <template>
   <main class="kiosk-shell" :data-screen="screen">
-    <ScrollMorphBackground :muted="screen !== 'idle'" />
+    <ScrollMorphBackground v-if="screen === 'idle'" />
+    <InfiniteGrid v-else />
     <header v-if="screen !== 'idle'" class="topbar">
       <div class="brand-mark">AI</div>
       <div>

@@ -24,6 +24,12 @@ const rightTrack = computed(() => {
   const reversed = [...sourceImages].reverse();
   return [...reversed, ...reversed];
 });
+const ringCards = computed(() =>
+  Array.from({ length: 16 }, (_, index) => {
+    const photo = sourceImages[index % sourceImages.length];
+    return { ...photo, angle: `${(index / 16) * 360}deg` };
+  }),
+);
 </script>
 
 <template>
@@ -43,6 +49,16 @@ const rightTrack = computed(() => {
           </figure>
         </div>
       </div>
+    </div>
+    <div class="scroll-morph-ring">
+      <figure
+        v-for="(photo, index) in ringCards"
+        :key="`ring-${index}`"
+        class="scroll-morph-ring-photo"
+        :style="{ '--ring-angle': photo.angle }"
+      >
+        <img :src="photo[0]" :alt="photo[1]" loading="eager" />
+      </figure>
     </div>
     <div class="scroll-morph-center-wash"></div>
   </div>
@@ -86,6 +102,33 @@ const rightTrack = computed(() => {
   animation-duration: 53s;
   animation-delay: -17s;
 }
+.scroll-morph-ring {
+  position: absolute;
+  z-index: 1;
+  top: 39%;
+  left: 50%;
+  width: min(47vw, 590px);
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  animation: ring-orbit 58s linear infinite;
+  will-change: transform;
+}
+.scroll-morph-ring-photo {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: clamp(48px, 5vw, 76px);
+  height: clamp(70px, 7.5vw, 108px);
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid rgba(12,18,16,.2);
+  border-radius: 12px;
+  background: #e8e9e5;
+  box-shadow: 0 10px 24px rgba(12,18,16,.14);
+  opacity: .8;
+  transform: rotate(var(--ring-angle)) translateY(calc(min(23.5vw, 295px) * -1));
+}
+.scroll-morph-ring-photo img { width: 100%; height: 100%; object-fit: cover; }
 .scroll-morph-photo {
   width: 100%;
   height: clamp(156px, 22vh, 290px);
@@ -103,7 +146,7 @@ const rightTrack = computed(() => {
   z-index: 2;
   inset: 0;
   background:
-    linear-gradient(90deg, rgba(255,255,255,.05) 0%, rgba(255,255,255,.58) 18%, rgba(255,255,255,.88) 34%, rgba(255,255,255,.92) 50%, rgba(255,255,255,.88) 66%, rgba(255,255,255,.58) 82%, rgba(255,255,255,.05) 100%),
+    linear-gradient(90deg, rgba(255,255,255,.05) 0%, rgba(255,255,255,.62) 18%, rgba(255,255,255,.9) 34%, rgba(255,255,255,.94) 50%, rgba(255,255,255,.9) 66%, rgba(255,255,255,.62) 82%, rgba(255,255,255,.05) 100%),
     linear-gradient(180deg, rgba(255,255,255,.22), transparent 24%, transparent 76%, rgba(255,255,255,.28));
 }
 @keyframes waterfall-up {
@@ -114,8 +157,13 @@ const rightTrack = computed(() => {
   from { transform: translateY(-50%); }
   to { transform: translateY(0); }
 }
+@keyframes ring-orbit {
+  from { transform: translate(-50%, -50%) rotate(0deg); }
+  to { transform: translate(-50%, -50%) rotate(360deg); }
+}
 @media (prefers-reduced-motion: reduce) {
   .scroll-morph-track { animation-duration: 120s; }
+  .scroll-morph-ring { animation-duration: 150s; }
 }
 @media (max-width: 700px) {
   .scroll-morph-gallery {
@@ -129,6 +177,15 @@ const rightTrack = computed(() => {
   }
   .scroll-morph-column-right { padding-top: 9vh; }
   .scroll-morph-track { gap: 8px; padding: 10px 0; }
+  .scroll-morph-ring {
+    top: 37%;
+    width: 58vw;
+  }
+  .scroll-morph-ring-photo {
+    width: 42px;
+    height: 62px;
+    transform: rotate(var(--ring-angle)) translateY(-29vw);
+  }
   .scroll-morph-center-wash {
     background: linear-gradient(90deg, rgba(255,255,255,.05), rgba(255,255,255,.82) 24%, rgba(255,255,255,.92) 50%, rgba(255,255,255,.82) 76%, rgba(255,255,255,.05));
   }
