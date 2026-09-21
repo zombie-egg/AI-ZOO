@@ -3,7 +3,12 @@ from __future__ import annotations
 import json
 
 from app.db import Database
-from app.prompt_builder import NATURAL_EXPRESSION_PROMPT_VERSION
+import pytest
+
+from app.prompt_builder import (
+    NATURAL_EXPRESSION_PROMPT_VERSION,
+    REFERENCE_FAITHFUL_PROMPT_VERSION,
+)
 from app.references import build_reference_manifest, public_reference_labels
 from app.scene_catalog import (
     compose_generation_prompt,
@@ -39,6 +44,29 @@ def test_four_people_use_symmetric_twelve_reference_manifest(settings):
         "front_smile",
         "left_three_quarter",
     }
+
+
+def test_primary_reference_is_first_and_every_reference_has_safe_diagnostics(settings):
+    manifest = build_reference_manifest(_participants(settings, 1), settings, pose_id="BACK")
+    assert [item["shot_role"] for item in manifest] == [
+        "front_smile",
+        "left_three_quarter",
+        "body_anchor",
+        "right_three_quarter",
+    ]
+    assert manifest[0]["reference_role"] == "SUBJECT_PRIMARY"
+    assert all(item["decoded"] is True for item in manifest)
+    assert all((item["width"], item["height"]) == (600, 900) for item in manifest)
+    assert all(item["mime_type"] == "image/jpeg" for item in manifest)
+
+
+def test_reference_manifest_fails_closed_for_an_undecodable_image(settings):
+    groups = _participants(settings, 1)
+    broken = settings.private_dir / "refs" / "broken.jpg"
+    broken.write_bytes(b"not-an-image")
+    groups[0]["source_paths"][1] = str(broken)
+    with pytest.raises(ValueError, match="无法解码"):
+        build_reference_manifest(groups, settings)
 
 
 def test_prompt_text_and_reference_manifest_are_frozen_on_job(settings):
@@ -82,3 +110,54 @@ def test_prompt_text_and_reference_manifest_are_frozen_on_job(settings):
     assert row["prompt_version"].startswith(NATURAL_EXPRESSION_PROMPT_VERSION)
     assert json.loads(row["reference_manifest_json"]) == manifest
     assert "PERSON 1" in row["prompt_text"]
+
+
+def test_reference_faithful_prompt_uses_the_sample_requirement_only_when_resolved():
+    sample_requirement = (
+        "The subject is not wearing glasses. Keep the dense fringe covering the forehead as shown "
+        "in the primary subject reference, adapted naturally to the selected head angle."
+    )
+    sample_expression = (
+        "Keep a relaxed neutral expression consistent with the subject reference, with a comfortable "
+        "mouth and naturally attentive eyes. Do not introduce a smile for this test."
+    )
+    sample = compose_generation_prompt(
+        get_scene("RED_PANDA_VIEW_01"),
+        get_pose("BACK"),
+        prompt_version=REFERENCE_FAITHFUL_PROMPT_VERSION,
+        resolved_appearance_requirements=[sample_requirement],
+        resolved_expression=sample_expression,
+    )
+    other_user = compose_generation_prompt(
+        get_scene("RED_PANDA_VIEW_01"),
+        get_pose("BACK"),
+        prompt_version=REFERENCE_FAITHFUL_PROMPT_VERSION,
+    )
+    assert sample_requirement in sample
+    assert sample_expression in sample
+    assert sample.count("EXPRESSION —") == 1
+    assert sample_requirement not in other_user
+    assert "follow SUBJECT_PRIMARY" in other_user
+    assert "Do not invent or remove glasses" in other_user
+
+
+def test_reference_faithful_prompt_compiles_all_real_scene_pose_combinations():
+    from app.scene_catalog import POSES, SCENES
+
+    assert len(SCENES) == 9
+    assert len(POSES) == 3
+    for scene in SCENES:
+        for pose in POSES:
+            prompt = compose_generation_prompt(
+                scene,
+                pose,
+                prompt_version=REFERENCE_FAITHFUL_PROMPT_VERSION,
+            )
+            assert scene.scene_id in prompt
+            assert pose.pose_id in prompt
+            assert prompt.count("EXPRESSION —") == 1
+            assert "SUBJECT_PRIMARY" in prompt
+            assert "SCENE_REFERENCE or POSE_REFERENCE" in prompt
+            assert "{{" not in prompt and "}}" not in prompt
+            assert "face-slimming treatment" not in prompt
+            assert "moderate, natural brightening and whitening" not in prompt

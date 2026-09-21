@@ -24,8 +24,10 @@ from .references import (
     active_model_id,
     build_reference_manifest,
     legacy_reference_manifest,
+    public_reference_diagnostics,
     public_reference_labels,
     reference_image_limit,
+    validate_reference_manifest,
 )
 from .scene_catalog import (
     compose_generation_prompt,
@@ -355,7 +357,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             return response
 
         try:
-            reference_manifest = build_reference_manifest(stored_participants, current)
+            reference_manifest = build_reference_manifest(
+                stored_participants,
+                current,
+                pose_id=pose.pose_id,
+            )
             reference_labels = public_reference_labels(reference_manifest)
             prompt = compose_generation_prompt(
                 scene,
@@ -449,7 +455,18 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         job = service.db.one("SELECT * FROM generation_job WHERE id = ?", (job_id,))
         if not job:
             raise HTTPException(status_code=404, detail="直连生成任务不存在")
+        manifest = json.loads(job.get("reference_manifest_json") or "[]")
+        diagnostics: list[dict[str, Any]] = []
+        diagnostic_error: str | None = None
+        try:
+            validate_reference_manifest(manifest)
+            diagnostics = public_reference_diagnostics(manifest)
+        except ValueError as exc:
+            diagnostic_error = str(exc)
+        attempts = json.loads(job["attempts_json"])
         return {
+            "task_id": job["id"],
+            "request_id": job["id"],
             "generation_id": job["id"],
             "order_no": job["order_no"],
             "scene_id": job["scene_id"],
@@ -457,10 +474,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "participant_count": len(json.loads(job.get("participants_json") or "[]")) or 1,
             "prompt_version": job["prompt_version"],
             "prompt_hash": job["prompt_hash"],
-            "reference_count": len(json.loads(job.get("reference_manifest_json") or "[]"))
+            "model_id": job.get("provider"),
+            "reference_count": len(manifest)
             or len(json.loads(job["source_paths_json"])),
+            "reference_diagnostics": diagnostics,
+            "reference_diagnostic_error": diagnostic_error,
             "status": job["status"],
-            "attempts": json.loads(job["attempts_json"]),
+            "attempts": attempts,
             "qa": json.loads(job["qa_json"]),
             "cost_cents": job["cost_cents"],
             "error_msg": job["error_msg"],

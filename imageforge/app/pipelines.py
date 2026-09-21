@@ -11,7 +11,11 @@ from .config import Settings
 from .db import Database
 from .face_engine import FaceEngine
 from .providers import ImageProvider, ReferenceImage
-from .references import legacy_reference_manifest, validate_reference_manifest
+from .references import (
+    legacy_reference_manifest,
+    public_reference_diagnostics,
+    validate_reference_manifest,
+)
 from .security import generation_provider_scope
 from .storage import (
     create_print_payload,
@@ -76,9 +80,16 @@ def run_direct_generation_pipeline(
         )
         return
     selected_references = [
-        ReferenceImage(data=Path(item["path"]).read_bytes(), label=str(item["label"]))
+        ReferenceImage(
+            data=Path(item["path"]).read_bytes(),
+            label=str(item["label"]),
+            mime_type=str(item["mime_type"]),
+            width=int(item["width"]),
+            height=int(item["height"]),
+        )
         for item in selected_manifest
     ]
+    reference_diagnostics = public_reference_diagnostics(selected_manifest)
 
     output_dir = settings.private_dir / "generation" / job_id
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -88,13 +99,14 @@ def run_direct_generation_pipeline(
     cost_cents = 0
     started_at = time.monotonic()
     logger.info(
-        "generation_started request_id=%s prompt_version=%s scene_id=%s pose_id=%s model_id=%s reference_count=%s",
+        "generation_started request_id=%s prompt_version=%s scene_id=%s pose_id=%s model_id=%s reference_count=%s reference_diagnostics=%s",
         job_id,
         job["prompt_version"],
         job["scene_id"],
         job["pose_id"],
         job.get("provider") or getattr(provider, "model", provider.name),
         len(selected_references),
+        json.dumps(reference_diagnostics, ensure_ascii=True, separators=(",", ":")),
     )
 
     for attempt_no in range(1, settings.gpt_attempts + 1):
@@ -103,6 +115,7 @@ def run_direct_generation_pipeline(
             on_state("generating")
         record: dict = {
             "attempt": attempt_no,
+            "request_id": job_id,
             "provider": provider.name,
             "participant_count": participant_count,
             "reference_count": len(selected_references),
@@ -123,6 +136,8 @@ def run_direct_generation_pipeline(
                 )
             record["elapsed_ms"] = round((time.monotonic() - attempt_started_at) * 1000)
             record["provider"] = getattr(provider, "last_provider_name", provider.name)
+            if getattr(provider, "last_request_id", None):
+                record["provider_request_id"] = str(provider.last_request_id)[:160]
             if getattr(provider, "used_fallback", False):
                 record["fallback"] = True
             cost_cents += settings.gpt_image_estimated_cost_cents

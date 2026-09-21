@@ -232,4 +232,51 @@ def test_server_selected_natural_prompt_is_stored_and_client_cannot_override(set
         )
         assert job["prompt_version"].startswith("natural-expression-v1")
         assert "FACIAL EXPRESSION — gentle_camera_smile" in job["prompt_text"]
-        assert "PERSON 1 — body and outfit anchor" in job["prompt_text"]
+        assert "SUBJECT_PRIMARY — PERSON 1" in job["prompt_text"]
+        assert "SUBJECT_ADDITIONAL — PERSON 1" in job["prompt_text"]
+
+
+def test_reference_faithful_job_exposes_only_safe_request_diagnostics(settings):
+    settings.generation_prompt_version = "reference-faithful-v2"
+    app = create_app(settings)
+    service = app.state.imageforge
+    service.face_engine = FixtureFaceEngine([0.82] * 12)
+    face_ids = _seed_four_references(service, settings, "89")
+    with TestClient(app) as client:
+        response = client.post(
+            "/v4/generations",
+            headers=_internal(settings),
+            json={
+                "order_no": "DIRECT-FAITHFUL-DIAGNOSTICS",
+                "scene_id": "RED_PANDA_VIEW_01",
+                "pose_id": "BACK",
+                "face_ids": face_ids,
+                "prompt_version": "legacy",
+            },
+        )
+        assert response.status_code == 200
+        job_id = response.json()["generation_id"]
+        debug = client.get(f"/v4/generations/{job_id}/debug", headers=_internal(settings))
+        assert debug.status_code == 200
+        payload = debug.json()
+        assert payload["task_id"] == payload["request_id"] == job_id
+        assert payload["model_id"] == "mock"
+        assert payload["prompt_version"].startswith("reference-faithful-v2")
+        assert [item["shot_role"] for item in payload["reference_diagnostics"]] == [
+            "front_smile",
+            "left_three_quarter",
+            "body_anchor",
+            "right_three_quarter",
+        ]
+        assert payload["reference_diagnostics"][0] == {
+            "participant_slot": 1,
+            "reference_role": "SUBJECT_PRIMARY",
+            "shot_role": "front_smile",
+            "width": 600,
+            "height": 900,
+            "mime_type": "image/jpeg",
+            "decoded": True,
+        }
+        serialized = json.dumps(payload, ensure_ascii=False)
+        assert "source_paths" not in serialized
+        assert "base64" not in serialized.lower()

@@ -6,8 +6,10 @@ from dataclasses import dataclass
 from .prompt_builder import (
     LEGACY_PROMPT_VERSION,
     NATURAL_EXPRESSION_PROMPT_VERSION,
+    REFERENCE_FAITHFUL_PROMPT_VERSION,
     SUPPORTED_PROMPT_VERSIONS,
     build_natural_expression_prompt,
+    build_reference_faithful_prompt,
 )
 
 
@@ -409,6 +411,8 @@ def compose_generation_prompt(
     participant_count: int = 1,
     prompt_version: str = NATURAL_EXPRESSION_PROMPT_VERSION,
     reference_roles: tuple[str, ...] | list[str] | None = None,
+    resolved_appearance_requirements: tuple[str, ...] | list[str] | None = None,
+    resolved_expression: str | None = None,
 ) -> str:
     if prompt_version not in SUPPORTED_PROMPT_VERSIONS:
         raise ValueError(f"不支持的提示词版本：{prompt_version}")
@@ -417,16 +421,39 @@ def compose_generation_prompt(
             f"{scene.full_prompt}\n\n{_group_instruction(participant_count)}"
             f"\n\nSELECTED VISITOR POSE:\n{pose.instruction}"
         )
-    roles = reference_roles or tuple(
-        role
-        for slot in range(1, participant_count + 1)
-        for role in (
-            f"Reference image for PERSON {slot}: body and outfit anchor",
-            f"Reference image for PERSON {slot}: primary front-face identity view",
-            f"Reference image for PERSON {slot}: left three-quarter identity view",
-            f"Reference image for PERSON {slot}: right three-quarter identity view",
+    if reference_roles:
+        roles = reference_roles
+    elif prompt_version == REFERENCE_FAITHFUL_PROMPT_VERSION:
+        roles = tuple(
+            role
+            for slot in range(1, participant_count + 1)
+            for role in (
+                f"SUBJECT_PRIMARY — PERSON {slot} — current appearance authority and primary front-face identity view",
+                f"SUBJECT_ADDITIONAL — PERSON {slot} — body, outfit, hairstyle, and accessory context",
+                f"SUBJECT_ADDITIONAL — PERSON {slot} — left three-quarter facial identity view",
+                f"SUBJECT_ADDITIONAL — PERSON {slot} — right three-quarter facial identity view",
+            )
         )
-    )
+    else:
+        roles = tuple(
+            role
+            for slot in range(1, participant_count + 1)
+            for role in (
+                f"Reference image for PERSON {slot}: body and outfit anchor",
+                f"Reference image for PERSON {slot}: primary front-face identity view",
+                f"Reference image for PERSON {slot}: left three-quarter identity view",
+                f"Reference image for PERSON {slot}: right three-quarter identity view",
+            )
+        )
+    if prompt_version == REFERENCE_FAITHFUL_PROMPT_VERSION:
+        return build_reference_faithful_prompt(
+            scene,
+            pose,
+            participant_count,
+            roles,
+            resolved_appearance_requirements=resolved_appearance_requirements,
+            resolved_expression=resolved_expression,
+        )
     return build_natural_expression_prompt(scene, pose, participant_count, roles)
 
 
@@ -440,6 +467,11 @@ def composed_prompt_version(
         raise ValueError(f"不支持的提示词版本：{prompt_version}")
     if prompt_version == LEGACY_PROMPT_VERSION:
         return f"{scene.prompt_version}+{pose.prompt_version}+group-{participant_count}-v1+natural-face-v3"
+    if prompt_version == REFERENCE_FAITHFUL_PROMPT_VERSION:
+        return (
+            f"{REFERENCE_FAITHFUL_PROMPT_VERSION}+{scene.scene_id.lower()}"
+            f"+{pose.pose_id.lower()}+group-{participant_count}"
+        )
     return (
         f"{NATURAL_EXPRESSION_PROMPT_VERSION}+{scene.scene_id.lower()}"
         f"+{pose.pose_id.lower()}+group-{participant_count}"
@@ -452,6 +484,8 @@ def composed_prompt_hash(
     participant_count: int = 1,
     prompt_version: str = NATURAL_EXPRESSION_PROMPT_VERSION,
     reference_roles: tuple[str, ...] | list[str] | None = None,
+    resolved_appearance_requirements: tuple[str, ...] | list[str] | None = None,
+    resolved_expression: str | None = None,
 ) -> str:
     prompt = compose_generation_prompt(
         scene,
@@ -459,5 +493,7 @@ def composed_prompt_hash(
         participant_count,
         prompt_version=prompt_version,
         reference_roles=reference_roles,
+        resolved_appearance_requirements=resolved_appearance_requirements,
+        resolved_expression=resolved_expression,
     )
     return hashlib.sha256(prompt.encode("utf-8")).hexdigest()

@@ -79,6 +79,31 @@ def test_gemini_provider_uses_native_multimodal_request(settings, monkeypatch):
     assert body["generationConfig"]["imageConfig"]["aspectRatio"] == "2:3"
 
 
+def test_gemini_provider_rejects_text_only_generation(settings):
+    settings.fallback_image_base_url = "https://relay.example"
+    settings.fallback_image_api_key = "test-key"
+    provider = GeminiGenerateContentProvider(settings)
+    with generation_provider_scope("provider-no-reference"):
+        with pytest.raises(ProviderError, match="缺少主体图像"):
+            provider.generate("make a random person", None, "1024x1536", [])
+
+
+def test_gemini_provider_rejects_declared_mime_mismatch(settings):
+    settings.fallback_image_base_url = "https://relay.example"
+    settings.fallback_image_api_key = "test-key"
+    provider = GeminiGenerateContentProvider(settings)
+    reference = ReferenceImage(
+        _jpeg_bytes(),
+        "SUBJECT_PRIMARY — PERSON 1",
+        mime_type="image/png",
+        width=40,
+        height=60,
+    )
+    with generation_provider_scope("provider-mime-mismatch"):
+        with pytest.raises(ProviderError, match="MIME"):
+            provider.generate("keep this person", None, "1024x1536", [reference])
+
+
 def test_build_provider_can_use_gemini_as_primary(settings):
     settings.image_provider_override = "gemini"
     settings.fallback_image_base_url = "https://relay.example"

@@ -20,6 +20,9 @@ class ProviderError(RuntimeError):
 class ReferenceImage:
     data: bytes
     label: str
+    mime_type: str | None = None
+    width: int | None = None
+    height: int | None = None
 
 
 def _reference_data(reference: bytes | ReferenceImage) -> bytes:
@@ -30,6 +33,10 @@ def _reference_label(reference: bytes | ReferenceImage, index: int) -> str:
     if isinstance(reference, ReferenceImage) and reference.label.strip():
         return reference.label.strip()
     return f"Subject identity reference {index}"
+
+
+def _reference_mime_type(reference: bytes | ReferenceImage) -> str | None:
+    return reference.mime_type if isinstance(reference, ReferenceImage) else None
 
 
 class ImageProvider(ABC):
@@ -108,6 +115,7 @@ class OpenAICompatibleProvider(GuardedProvider):
         self.settings = settings
         self.model = model
         self.name = name
+        self.last_request_id: str | None = None
 
     def _decode_response(self, response: httpx.Response) -> bytes:
         try:
@@ -141,6 +149,8 @@ class OpenAICompatibleProvider(GuardedProvider):
         size: str,
         reference_images: list[bytes | ReferenceImage],
     ) -> bytes:
+        if init_image is None and not reference_images:
+            raise ProviderError("缺少主体图像输入，拒绝降级为随机人物文生图")
         token = self.settings.provider_token
         if not token:
             raise ProviderError("未配置 NEWAPI_TOKEN/GPT_IMAGE_API_KEY")
@@ -187,6 +197,7 @@ class OpenAICompatibleProvider(GuardedProvider):
                         "output_format": "jpeg",
                     },
                 )
+        self.last_request_id = response.headers.get("x-request-id")
         return self._decode_response(response)
 
 
@@ -201,19 +212,24 @@ class GeminiGenerateContentProvider(GuardedProvider):
     def __init__(self, settings: Settings):
         self.settings = settings
         self.model = settings.fallback_image_model.strip()
+        self.last_request_id: str | None = None
 
     @staticmethod
     def _mime_type(image_bytes: bytes) -> str:
         try:
             with Image.open(io.BytesIO(image_bytes)) as image:
-                image_format = (image.format or "JPEG").upper()
-        except (OSError, ValueError):
-            image_format = "JPEG"
-        return {
+                image.load()
+                image_format = (image.format or "").upper()
+        except (OSError, ValueError) as exc:
+            raise ProviderError("参考图在供应商请求前无法解码") from exc
+        mime_type = {
             "PNG": "image/png",
             "WEBP": "image/webp",
-            "GIF": "image/gif",
-        }.get(image_format, "image/jpeg")
+            "JPEG": "image/jpeg",
+        }.get(image_format)
+        if mime_type is None:
+            raise ProviderError(f"供应商不支持该参考图格式：{image_format or 'unknown'}")
+        return mime_type
 
     @staticmethod
     def _aspect_ratio(size: str) -> str:
@@ -270,6 +286,8 @@ class GeminiGenerateContentProvider(GuardedProvider):
         size: str,
         reference_images: list[bytes | ReferenceImage],
     ) -> bytes:
+        if init_image is None and not reference_images:
+            raise ProviderError("缺少主体图像输入，拒绝降级为随机人物文生图")
         token = self.settings.fallback_image_api_key.strip()
         if not token:
             raise ProviderError("未配置 FALLBACK_IMAGE_API_KEY")
@@ -288,12 +306,16 @@ class GeminiGenerateContentProvider(GuardedProvider):
             )
         for index, reference in enumerate(reference_images, 1):
             image_bytes = _reference_data(reference)
+            detected_mime_type = self._mime_type(image_bytes)
+            declared_mime_type = _reference_mime_type(reference)
+            if declared_mime_type and declared_mime_type != detected_mime_type:
+                raise ProviderError("参考图 MIME 类型与解码结果不一致")
             parts.extend(
                 [
                     {"text": _reference_label(reference, index)},
                     {
                         "inlineData": {
-                            "mimeType": self._mime_type(image_bytes),
+                            "mimeType": detected_mime_type,
                             "data": base64.b64encode(image_bytes).decode("ascii"),
                         }
                     },
@@ -322,6 +344,11 @@ class GeminiGenerateContentProvider(GuardedProvider):
                     },
                 },
             )
+        self.last_request_id = (
+            response.headers.get("x-request-id")
+            or response.headers.get("x-goog-request-id")
+            or response.headers.get("request-id")
+        )
         return self._decode_response(response)
 
 
@@ -332,6 +359,7 @@ class FallbackProvider(GuardedProvider):
         self.name = f"{primary.name}+{fallback.name}"
         self.last_provider_name = primary.name
         self.used_fallback = False
+        self.last_request_id: str | None = None
 
     def _generate(
         self,
@@ -342,13 +370,18 @@ class FallbackProvider(GuardedProvider):
     ) -> bytes:
         self.last_provider_name = self.primary.name
         self.used_fallback = False
+        self.last_request_id = None
         try:
-            return self.primary.generate(prompt, init_image, size, reference_images)
+            result = self.primary.generate(prompt, init_image, size, reference_images)
+            self.last_request_id = getattr(self.primary, "last_request_id", None)
+            return result
         except (ProviderError, httpx.HTTPError) as primary_error:
             self.last_provider_name = self.fallback.name
             self.used_fallback = True
             try:
-                return self.fallback.generate(prompt, init_image, size, reference_images)
+                result = self.fallback.generate(prompt, init_image, size, reference_images)
+                self.last_request_id = getattr(self.fallback, "last_request_id", None)
+                return result
             except (ProviderError, httpx.HTTPError) as fallback_error:
                 raise ProviderError(
                     f"主图片服务失败（{primary_error}）；Gemini 兜底也失败（{fallback_error}）"

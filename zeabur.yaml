@@ -255,7 +255,7 @@ spec:
           REFERENCE_MAX_EDGE_PX:
             default: "3072"
           RELEASE_VERSION:
-            default: natural-expression-v1-compatible-20260921
+            default: reference-faithful-v2-compatible-20260921
           PUBLIC_BASE_URL:
             default: ${ZEABUR_WEB_URL}
           CORS_ALLOWED_ORIGINS:

@@ -9,8 +9,8 @@ AI ZOO 是一套完整的现场拍摄、AI 多人合照生成、人工验图与�
 3. 每位参与者分别完成人脸照片授权。
 4. 统一选择动物场景和正面、侧身或背影姿势。
 5. 每个人单独完成半身、正面、左侧和右侧四连拍，再汇总检查。
-6. GPT-image-2 生成，Gemini 图片模型作为失败兜底。
-7. Prompt 对每个人独立执行美白、磨皮、黑眼圈淡化和自然瘦脸，并禁止身份、发型、服装互换。
+6. 将已标注主参考/补充角度的真实用户图以 Gemini `inlineData` 直接生成选定场景。
+7. Prompt 优先保留每个人的面部比例、发型/刘海、眼镜状态、配饰和穿搭，不默认美白、瘦脸或放大眼睛。
 8. 工作人员逐人确认成品后，向打印代理发送一次、单页、单份打印任务。
 9. 最终取片二维码直连带签名的高清照片下载，24 小时内有效。
 
@@ -81,7 +81,7 @@ npm start
 - `SIGNING_SECRET`
 - `KIOSK_DEVICE_PROXY_TOKEN`
 - `KIOSK_PAYMENT_MODE`（未接微信商户接口时设为 `mock`，正式上线时设为 `wechat_native`）
-- `GENERATION_PROMPT_VERSION`（真实视觉 A/B 通过前保持 `legacy`；新版为 `natural-expression-v1`）
+- `GENERATION_PROMPT_VERSION`（真实视觉 A/B 通过前保持 `legacy`；外观优先新版为 `reference-faithful-v2`）
 
 GitHub 的 `main` 分支更新后，Zeabur Git 服务会自动重新构建部署。
 
@@ -95,4 +95,4 @@ php -l server/app/api/logic/KioskLogic.php
 
 生成图片会产生第三方 API 费用。自动化验证不应触发真实生图或实际打印。
 
-自然表情提示词结构、参考图角色、灰度启用和回退方式见 [`PROMPT_UPGRADE.md`](PROMPT_UPGRADE.md)。
+外观忠实提示词结构、参考图角色、请求诊断、灰度启用和回退方式见 [`PROMPT_UPGRADE.md`](PROMPT_UPGRADE.md)。
