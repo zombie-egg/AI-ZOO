@@ -7,7 +7,7 @@ import httpx
 import pytest
 from PIL import Image
 
-from app.providers import GeminiGenerateContentProvider, ProviderError, build_provider
+from app.providers import GeminiGenerateContentProvider, ProviderError, ReferenceImage, build_provider
 from app.security import generation_provider_scope
 
 
@@ -56,7 +56,10 @@ def test_gemini_provider_uses_native_multimodal_request(settings, monkeypatch):
 
     monkeypatch.setattr("app.providers.httpx.Client", client_factory)
     provider = GeminiGenerateContentProvider(settings)
-    references = [_jpeg_bytes() for _ in range(4)]
+    references = [
+        ReferenceImage(_jpeg_bytes(), f"PERSON 1 — reference role {index}")
+        for index in range(1, 5)
+    ]
     with generation_provider_scope("provider-test"):
         result = provider.generate("keep the same person", None, "1024x1536", references)
 
@@ -66,7 +69,12 @@ def test_gemini_provider_uses_native_multimodal_request(settings, monkeypatch):
     )
     assert captured["authorization"] == "Bearer test-key"
     body = __import__("json").loads(captured["body"])
-    assert len(body["contents"][0]["parts"]) == 5
+    parts = body["contents"][0]["parts"]
+    assert len(parts) == 9
+    assert [parts[index]["text"] for index in (1, 3, 5, 7)] == [
+        f"PERSON 1 — reference role {index}" for index in range(1, 5)
+    ]
+    assert all("inlineData" in parts[index] for index in (2, 4, 6, 8))
     assert body["generationConfig"]["responseModalities"] == ["IMAGE"]
     assert body["generationConfig"]["imageConfig"]["aspectRatio"] == "2:3"
 

@@ -46,6 +46,13 @@ class Settings(BaseSettings):
     fallback_image_api_key: str = ""
     fallback_image_model: str = "gemini-3.1-flash-image-preview"
 
+    # 由服务端环境控制；客户端请求没有提示词版本字段。视觉 A/B 完成前生产保持 legacy。
+    generation_prompt_version: str = Field(default="legacy", pattern=r"^(legacy|natural-expression-v1)$")
+    # Gemini 3.1 官方总输入参考上限为 14；网关若有更低限制可在服务端收紧。
+    reference_image_limit: int = Field(default=14, ge=1, le=14)
+    reference_max_edge_px: int = Field(default=3072, ge=1024, le=4096)
+    release_version: str = "natural-expression-v1-compatible-20260921"
+
     face_engine: str = "local"
     facefusion_python: str = "python"
     facefusion_root: Path = Path("/opt/facefusion")

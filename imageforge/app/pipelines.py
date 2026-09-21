@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import statistics
 import time
 from pathlib import Path
@@ -9,7 +10,8 @@ from typing import Callable
 from .config import Settings
 from .db import Database
 from .face_engine import FaceEngine
-from .providers import ImageProvider
+from .providers import ImageProvider, ReferenceImage
+from .references import legacy_reference_manifest, validate_reference_manifest
 from .security import generation_provider_scope
 from .storage import (
     create_print_payload,
@@ -25,6 +27,9 @@ class PipelineError(RuntimeError):
     pass
 
 
+logger = logging.getLogger(__name__)
+
+
 def run_direct_generation_pipeline(
     job_id: str,
     db: Database,
@@ -32,6 +37,7 @@ def run_direct_generation_pipeline(
     face_engine: FaceEngine,
     provider: ImageProvider,
     prompt: str,
+    reference_manifest: list[dict] | None = None,
     sleep: Callable[[float], None] = time.sleep,
     on_state: Callable[[str], None] | None = None,
 ) -> None:
@@ -57,12 +63,39 @@ def run_direct_generation_pipeline(
         )
         return
 
+    selected_manifest = reference_manifest or legacy_reference_manifest(participant_groups)
+    try:
+        validate_reference_manifest(selected_manifest)
+    except ValueError as exc:
+        db.update_generation(
+            job_id,
+            status="failed",
+            progress=100,
+            eta_seconds=0,
+            error_msg=str(exc),
+        )
+        return
+    selected_references = [
+        ReferenceImage(data=Path(item["path"]).read_bytes(), label=str(item["label"]))
+        for item in selected_manifest
+    ]
+
     output_dir = settings.private_dir / "generation" / job_id
     output_dir.mkdir(parents=True, exist_ok=True)
     attempts: list[dict] = []
     best_candidate: Path | None = None
     best_score = -1.0
     cost_cents = 0
+    started_at = time.monotonic()
+    logger.info(
+        "generation_started request_id=%s prompt_version=%s scene_id=%s pose_id=%s model_id=%s reference_count=%s",
+        job_id,
+        job["prompt_version"],
+        job["scene_id"],
+        job["pose_id"],
+        job.get("provider") or getattr(provider, "model", provider.name),
+        len(selected_references),
+    )
 
     for attempt_no in range(1, settings.gpt_attempts + 1):
         db.update_generation(job_id, status="generating", progress=15, eta_seconds=90)
@@ -72,17 +105,23 @@ def run_direct_generation_pipeline(
             "attempt": attempt_no,
             "provider": provider.name,
             "participant_count": participant_count,
-            "reference_count": len(source_paths),
+            "reference_count": len(selected_references),
             "prompt_hash": job["prompt_hash"],
+            "prompt_version": job["prompt_version"],
+            "scene_id": job["scene_id"],
+            "pose_id": job["pose_id"],
+            "model_id": job.get("provider") or getattr(provider, "model", provider.name),
         }
+        attempt_started_at = time.monotonic()
         try:
             with generation_provider_scope(job_id):
                 result = provider.generate(
                     prompt,
                     None,
                     "1024x1536",
-                    reference_images=[path.read_bytes() for path in source_paths],
+                    reference_images=selected_references,
                 )
+            record["elapsed_ms"] = round((time.monotonic() - attempt_started_at) * 1000)
             record["provider"] = getattr(provider, "last_provider_name", provider.name)
             if getattr(provider, "used_fallback", False):
                 record["fallback"] = True
@@ -130,7 +169,12 @@ def run_direct_generation_pipeline(
             if attempt_no < settings.gpt_attempts:
                 sleep(2)
         except Exception as exc:
-            record.update(result="error", error=type(exc).__name__, message=str(exc)[:300])
+            record.update(
+                result="error",
+                error=type(exc).__name__,
+                message=str(exc)[:300],
+                elapsed_ms=round((time.monotonic() - attempt_started_at) * 1000),
+            )
             attempts.append(record)
             if attempt_no < settings.gpt_attempts:
                 sleep(2)
@@ -147,6 +191,16 @@ def run_direct_generation_pipeline(
         )
         if on_state:
             on_state("failed")
+        logger.info(
+            "generation_finished request_id=%s prompt_version=%s scene_id=%s pose_id=%s model_id=%s reference_count=%s elapsed_ms=%s status=failed",
+            job_id,
+            job["prompt_version"],
+            job["scene_id"],
+            job["pose_id"],
+            job.get("provider") or getattr(provider, "model", provider.name),
+            len(selected_references),
+            round((time.monotonic() - started_at) * 1000),
+        )
         return
 
     final_path = output_dir / "gpt-image-2-final.jpg"
@@ -169,7 +223,7 @@ def run_direct_generation_pipeline(
         "identity_engine_production_ready": face_engine.production_ready,
         "best_identity_score": None if not face_engine.production_ready else round(best_score, 4),
         "participant_count": participant_count,
-        "reference_count": len(source_paths),
+        "reference_count": len(selected_references),
         "participant_review_required": list(range(1, participant_count + 1)),
     }
     db.update_generation(
@@ -186,3 +240,13 @@ def run_direct_generation_pipeline(
     )
     if on_state:
         on_state("review_required")
+    logger.info(
+        "generation_finished request_id=%s prompt_version=%s scene_id=%s pose_id=%s model_id=%s reference_count=%s elapsed_ms=%s status=review_required",
+        job_id,
+        job["prompt_version"],
+        job["scene_id"],
+        job["pose_id"],
+        job.get("provider") or getattr(provider, "model", provider.name),
+        len(selected_references),
+        round((time.monotonic() - started_at) * 1000),
+    )

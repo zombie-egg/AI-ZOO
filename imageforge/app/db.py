@@ -25,8 +25,10 @@ CREATE TABLE IF NOT EXISTS generation_job (
     pose_id TEXT NOT NULL DEFAULT 'FRONT',
     prompt_version TEXT NOT NULL,
     prompt_hash TEXT NOT NULL,
+    prompt_text TEXT,
     source_paths_json TEXT NOT NULL,
     participants_json TEXT NOT NULL DEFAULT '[]',
+    reference_manifest_json TEXT NOT NULL DEFAULT '[]',
     sku TEXT,
     status TEXT NOT NULL,
     progress INTEGER NOT NULL DEFAULT 0,
@@ -65,6 +67,12 @@ class Database:
                 conn.execute(
                     "ALTER TABLE generation_job ADD COLUMN participants_json TEXT NOT NULL DEFAULT '[]'"
                 )
+            if "prompt_text" not in columns:
+                conn.execute("ALTER TABLE generation_job ADD COLUMN prompt_text TEXT")
+            if "reference_manifest_json" not in columns:
+                conn.execute(
+                    "ALTER TABLE generation_job ADD COLUMN reference_manifest_json TEXT NOT NULL DEFAULT '[]'"
+                )
 
     @contextmanager
     def connection(self) -> Iterator[sqlite3.Connection]:
@@ -99,9 +107,10 @@ class Database:
         try:
             self.execute(
                 """INSERT INTO generation_job
-                (id, order_no, scene_id, pose_id, prompt_version, prompt_hash, source_paths_json, participants_json,
-                 sku, status, progress, eta_seconds, provider, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'queued', 0, ?, ?, ?, ?)""",
+                (id, order_no, scene_id, pose_id, prompt_version, prompt_hash, prompt_text,
+                 source_paths_json, participants_json, reference_manifest_json, sku, status, progress,
+                 eta_seconds, provider, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'queued', 0, ?, ?, ?, ?)""",
                 (
                     values["id"],
                     values["order_no"],
@@ -109,8 +118,10 @@ class Database:
                     values.get("pose_id", "FRONT"),
                     values["prompt_version"],
                     values["prompt_hash"],
+                    values.get("prompt_text"),
                     json.dumps(values["source_paths"], ensure_ascii=False),
                     json.dumps(values.get("participants", []), ensure_ascii=False),
+                    json.dumps(values.get("reference_manifest", []), ensure_ascii=False),
                     values.get("sku"),
                     values.get("eta_seconds", 90),
                     values.get("provider"),

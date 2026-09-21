@@ -65,3 +65,13 @@ def signed_delivery_url(settings: Settings, job_id: str, filename: str) -> str:
 def image_bytes_to_rgb(payload: bytes) -> Image.Image:
     with Image.open(io.BytesIO(payload)) as image:
         return ImageOps.exif_transpose(image).convert("RGB")
+
+
+def normalize_reference_bytes(payload: bytes, max_edge: int) -> bytes:
+    """Apply EXIF orientation and a model-input size ceiling without cropping or beauty processing."""
+    image = image_bytes_to_rgb(payload)
+    if max(image.size) > max_edge:
+        image.thumbnail((max_edge, max_edge), Image.Resampling.LANCZOS)
+    buffer = io.BytesIO()
+    image.save(buffer, "JPEG", quality=95, optimize=True, progressive=True)
+    return buffer.getvalue()

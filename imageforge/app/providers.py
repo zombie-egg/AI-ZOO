@@ -3,7 +3,7 @@ from __future__ import annotations
 import base64
 import io
 from abc import ABC, abstractmethod
-from pathlib import Path
+from dataclasses import dataclass
 
 import httpx
 from PIL import Image, ImageEnhance, ImageFilter
@@ -16,6 +16,22 @@ class ProviderError(RuntimeError):
     pass
 
 
+@dataclass(frozen=True, slots=True)
+class ReferenceImage:
+    data: bytes
+    label: str
+
+
+def _reference_data(reference: bytes | ReferenceImage) -> bytes:
+    return reference.data if isinstance(reference, ReferenceImage) else reference
+
+
+def _reference_label(reference: bytes | ReferenceImage, index: int) -> str:
+    if isinstance(reference, ReferenceImage) and reference.label.strip():
+        return reference.label.strip()
+    return f"Subject identity reference {index}"
+
+
 class ImageProvider(ABC):
     name: str
 
@@ -25,7 +41,7 @@ class ImageProvider(ABC):
         prompt: str,
         init_image: bytes | None,
         size: str,
-        reference_images: list[bytes] | None = None,
+        reference_images: list[bytes | ReferenceImage] | None = None,
     ) -> bytes: ...
 
 
@@ -35,14 +51,18 @@ class GuardedProvider(ImageProvider):
         prompt: str,
         init_image: bytes | None,
         size: str,
-        reference_images: list[bytes] | None = None,
+        reference_images: list[bytes | ReferenceImage] | None = None,
     ) -> bytes:
         assert_provider_call_allowed()
         return self._generate(prompt, init_image, size, reference_images or [])
 
     @abstractmethod
     def _generate(
-        self, prompt: str, init_image: bytes | None, size: str, reference_images: list[bytes]
+        self,
+        prompt: str,
+        init_image: bytes | None,
+        size: str,
+        reference_images: list[bytes | ReferenceImage],
     ) -> bytes: ...
 
 
@@ -55,12 +75,18 @@ class MockProvider(GuardedProvider):
         self.calls = 0
 
     def _generate(
-        self, prompt: str, init_image: bytes | None, size: str, reference_images: list[bytes]
+        self,
+        prompt: str,
+        init_image: bytes | None,
+        size: str,
+        reference_images: list[bytes | ReferenceImage],
     ) -> bytes:
         self.calls += 1
         if self.fail:
             raise ProviderError("MockProvider 故意失败")
-        source_bytes = init_image or (reference_images[0] if reference_images else None)
+        source_bytes = init_image or (
+            _reference_data(reference_images[0]) if reference_images else None
+        )
         if not source_bytes:
             image = Image.new("RGB", (1024, 1536), (215, 225, 205))
         else:
@@ -109,7 +135,11 @@ class OpenAICompatibleProvider(GuardedProvider):
         raise ProviderError("图片网关既未返回 b64_json，也未返回 url")
 
     def _generate(
-        self, prompt: str, init_image: bytes | None, size: str, reference_images: list[bytes]
+        self,
+        prompt: str,
+        init_image: bytes | None,
+        size: str,
+        reference_images: list[bytes | ReferenceImage],
     ) -> bytes:
         token = self.settings.provider_token
         if not token:
@@ -123,7 +153,14 @@ class OpenAICompatibleProvider(GuardedProvider):
                 if init_image is not None:
                     files.append(("image[]", ("edit-source.jpg", init_image, "image/jpeg")))
                 files.extend(
-                    ("image[]", (f"visitor-reference-{index}.jpg", reference, "image/jpeg"))
+                    (
+                        "image[]",
+                        (
+                            f"visitor-reference-{index}.jpg",
+                            _reference_data(reference),
+                            "image/jpeg",
+                        ),
+                    )
                     for index, reference in enumerate(reference_images, 1)
                 )
                 response = client.post(
@@ -227,22 +264,41 @@ class GeminiGenerateContentProvider(GuardedProvider):
         raise ProviderError("Gemini 兜底响应中没有图片")
 
     def _generate(
-        self, prompt: str, init_image: bytes | None, size: str, reference_images: list[bytes]
+        self,
+        prompt: str,
+        init_image: bytes | None,
+        size: str,
+        reference_images: list[bytes | ReferenceImage],
     ) -> bytes:
         token = self.settings.fallback_image_api_key.strip()
         if not token:
             raise ProviderError("未配置 FALLBACK_IMAGE_API_KEY")
-        images = ([init_image] if init_image is not None else []) + reference_images
         parts: list[dict] = [{"text": prompt}]
-        parts.extend(
-            {
-                "inlineData": {
-                    "mimeType": self._mime_type(image_bytes),
-                    "data": base64.b64encode(image_bytes).decode("ascii"),
-                }
-            }
-            for image_bytes in images
-        )
+        if init_image is not None:
+            parts.extend(
+                [
+                    {"text": "Generated image to edit; this image does not replace the original identity references."},
+                    {
+                        "inlineData": {
+                            "mimeType": self._mime_type(init_image),
+                            "data": base64.b64encode(init_image).decode("ascii"),
+                        }
+                    },
+                ]
+            )
+        for index, reference in enumerate(reference_images, 1):
+            image_bytes = _reference_data(reference)
+            parts.extend(
+                [
+                    {"text": _reference_label(reference, index)},
+                    {
+                        "inlineData": {
+                            "mimeType": self._mime_type(image_bytes),
+                            "data": base64.b64encode(image_bytes).decode("ascii"),
+                        }
+                    },
+                ]
+            )
         base = self.settings.fallback_image_base_url.strip().rstrip("/")
         if base.endswith("/v1beta"):
             endpoint = f"{base}/models/{self.model}:generateContent"
@@ -278,7 +334,11 @@ class FallbackProvider(GuardedProvider):
         self.used_fallback = False
 
     def _generate(
-        self, prompt: str, init_image: bytes | None, size: str, reference_images: list[bytes]
+        self,
+        prompt: str,
+        init_image: bytes | None,
+        size: str,
+        reference_images: list[bytes | ReferenceImage],
     ) -> bytes:
         self.last_provider_name = self.primary.name
         self.used_fallback = False

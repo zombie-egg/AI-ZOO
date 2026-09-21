@@ -205,3 +205,31 @@ def test_participant_slots_must_be_contiguous(settings):
         )
         assert response.status_code == 422
         assert "连续排列" in response.json()["msg"]
+
+
+def test_server_selected_natural_prompt_is_stored_and_client_cannot_override(settings):
+    settings.generation_prompt_version = "natural-expression-v1"
+    app = create_app(settings)
+    service = app.state.imageforge
+    service.face_engine = FixtureFaceEngine([0.82] * 12)
+    face_ids = _seed_four_references(service, settings, "99")
+    with TestClient(app) as client:
+        response = client.post(
+            "/v4/generations",
+            headers=_internal(settings),
+            json={
+                "order_no": "DIRECT-NATURAL-PROMPT",
+                "scene_id": "PANDA_CASUAL_01",
+                "pose_id": "FRONT",
+                "face_ids": face_ids,
+                "prompt_version": "legacy",
+            },
+        )
+        assert response.status_code == 200
+        job = service.db.one(
+            "SELECT * FROM generation_job WHERE id = ?",
+            (response.json()["generation_id"],),
+        )
+        assert job["prompt_version"].startswith("natural-expression-v1")
+        assert "FACIAL EXPRESSION — gentle_camera_smile" in job["prompt_text"]
+        assert "PERSON 1 — body and outfit anchor" in job["prompt_text"]

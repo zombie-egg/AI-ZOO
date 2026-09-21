@@ -3,6 +3,13 @@ from __future__ import annotations
 import hashlib
 from dataclasses import dataclass
 
+from .prompt_builder import (
+    LEGACY_PROMPT_VERSION,
+    NATURAL_EXPRESSION_PROMPT_VERSION,
+    SUPPORTED_PROMPT_VERSIONS,
+    build_natural_expression_prompt,
+)
+
 
 @dataclass(frozen=True, slots=True)
 class ScenePrompt:
@@ -396,14 +403,61 @@ making the faces alike.
 Arrange shoulders, arms, hands, and depth naturally so bodies do not fuse or intersect."""
 
 
-def compose_generation_prompt(scene: ScenePrompt, pose: PosePrompt, participant_count: int = 1) -> str:
-    return f"{scene.full_prompt}\n\n{_group_instruction(participant_count)}\n\nSELECTED VISITOR POSE:\n{pose.instruction}"
+def compose_generation_prompt(
+    scene: ScenePrompt,
+    pose: PosePrompt,
+    participant_count: int = 1,
+    prompt_version: str = NATURAL_EXPRESSION_PROMPT_VERSION,
+    reference_roles: tuple[str, ...] | list[str] | None = None,
+) -> str:
+    if prompt_version not in SUPPORTED_PROMPT_VERSIONS:
+        raise ValueError(f"不支持的提示词版本：{prompt_version}")
+    if prompt_version == LEGACY_PROMPT_VERSION:
+        return (
+            f"{scene.full_prompt}\n\n{_group_instruction(participant_count)}"
+            f"\n\nSELECTED VISITOR POSE:\n{pose.instruction}"
+        )
+    roles = reference_roles or tuple(
+        role
+        for slot in range(1, participant_count + 1)
+        for role in (
+            f"Reference image for PERSON {slot}: body and outfit anchor",
+            f"Reference image for PERSON {slot}: primary front-face identity view",
+            f"Reference image for PERSON {slot}: left three-quarter identity view",
+            f"Reference image for PERSON {slot}: right three-quarter identity view",
+        )
+    )
+    return build_natural_expression_prompt(scene, pose, participant_count, roles)
 
 
-def composed_prompt_version(scene: ScenePrompt, pose: PosePrompt, participant_count: int = 1) -> str:
-    return f"{scene.prompt_version}+{pose.prompt_version}+group-{participant_count}-v1+natural-face-v3"
+def composed_prompt_version(
+    scene: ScenePrompt,
+    pose: PosePrompt,
+    participant_count: int = 1,
+    prompt_version: str = NATURAL_EXPRESSION_PROMPT_VERSION,
+) -> str:
+    if prompt_version not in SUPPORTED_PROMPT_VERSIONS:
+        raise ValueError(f"不支持的提示词版本：{prompt_version}")
+    if prompt_version == LEGACY_PROMPT_VERSION:
+        return f"{scene.prompt_version}+{pose.prompt_version}+group-{participant_count}-v1+natural-face-v3"
+    return (
+        f"{NATURAL_EXPRESSION_PROMPT_VERSION}+{scene.scene_id.lower()}"
+        f"+{pose.pose_id.lower()}+group-{participant_count}"
+    )
 
 
-def composed_prompt_hash(scene: ScenePrompt, pose: PosePrompt, participant_count: int = 1) -> str:
-    prompt = compose_generation_prompt(scene, pose, participant_count)
+def composed_prompt_hash(
+    scene: ScenePrompt,
+    pose: PosePrompt,
+    participant_count: int = 1,
+    prompt_version: str = NATURAL_EXPRESSION_PROMPT_VERSION,
+    reference_roles: tuple[str, ...] | list[str] | None = None,
+) -> str:
+    prompt = compose_generation_prompt(
+        scene,
+        pose,
+        participant_count,
+        prompt_version=prompt_version,
+        reference_roles=reference_roles,
+    )
     return hashlib.sha256(prompt.encode("utf-8")).hexdigest()

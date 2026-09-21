@@ -6,7 +6,8 @@ from pathlib import Path
 from app.db import Database
 from app.pipelines import run_direct_generation_pipeline
 from app.providers import FallbackProvider, MockProvider
-from app.scene_catalog import compose_generation_prompt, get_pose, get_scene
+from app.prompt_builder import LEGACY_PROMPT_VERSION, NATURAL_EXPRESSION_PROMPT_VERSION
+from app.scene_catalog import POSES, SCENES, compose_generation_prompt, get_pose, get_scene
 
 from conftest import FixtureFaceEngine, make_portrait
 
@@ -57,28 +58,33 @@ def test_direct_pipeline_never_uses_template_and_requires_review(settings):
     assert states == ["generating", "qa", "review_required"]
 
 
-def test_scene_prompt_requests_visible_smart_beauty_retouching():
+def test_natural_expression_prompt_separates_identity_from_expression():
     prompt = compose_generation_prompt(get_scene("PANDA_CASUAL_01"), get_pose("FRONT"))
-    assert "clearly visible, strong yet" in prompt
-    assert "visibly brighten and whiten" in prompt
-    assert "noticeable, even skin smoothing" in prompt
-    assert "approximately 10–15%" in prompt
-    assert "must not look wider or heavier" in prompt
-    assert "noticeably reduce dark circles" in prompt
-    assert "Never create an extreme" in prompt
+    assert "FACIAL EXPRESSION — gentle_camera_smile" in prompt
+    assert "Preserve identity while allowing natural changes" in prompt
+    assert "small, easy smile" in prompt
+    assert "heavy beauty retouching" in prompt
+    assert "face slimming" in prompt
+    assert "must retain full recognizability" not in prompt
+    assert "moderate, natural brightening and whitening" not in prompt
 
 
-def test_each_pose_has_distinct_coherent_instruction_and_keeps_beauty():
+def test_each_pose_has_one_distinct_expression_and_coherent_gaze():
     scene = get_scene("PANDA_CASUAL_01")
     front = compose_generation_prompt(scene, get_pose("FRONT"))
     side = compose_generation_prompt(scene, get_pose("SIDE"))
     back = compose_generation_prompt(scene, get_pose("BACK"))
-    assert "shoulders nearly parallel" in front
+    assert "attention rests on the camera" in front
     assert "45–60 degrees" in side
     assert "20–35 degrees" in back
+    assert "FACIAL EXPRESSION — gentle_camera_smile" in front
+    assert "FACIAL EXPRESSION — spontaneous_warmth" in side
+    assert "FACIAL EXPRESSION — attentive_interest" in back
+    assert "The gaze follows the lens" in side
+    assert "The eyes follow that animal" in back
     for prompt in (front, side, back):
-        assert "FACE SLIMMING AND CONTOUR — HIGH PRIORITY" in prompt
-        assert "SKIN WHITENING AND TONE" in prompt
+        assert prompt.count("FACIAL EXPRESSION —") == 1
+        assert "full required skin beauty and face-slimming" not in prompt
 
 
 def test_multi_person_prompt_locks_each_identity_and_group_layout():
@@ -86,11 +92,40 @@ def test_multi_person_prompt_locks_each_identity_and_group_layout():
         get_scene("PANDA_CASUAL_01"), get_pose("SIDE"), participant_count=3
     )
     assert "exactly 3 human visitors" in prompt
-    assert "PERSON 1: use ONLY reference group 1" in prompt
-    assert "PERSON 2: use ONLY reference group 2" in prompt
-    assert "PERSON 3: use ONLY reference group 3" in prompt
+    assert "PERSON 1: body and outfit anchor" in prompt
+    assert "PERSON 2: primary front-face identity view" in prompt
+    assert "PERSON 3: right three-quarter identity view" in prompt
     assert "three visitors in a shallow triangular arrangement" in prompt
-    assert "10–15% face-slimming treatment independently to every visible face" in prompt
+    assert "Never merge, average, duplicate, omit, or exchange" in prompt
+
+
+def test_all_scene_pose_combinations_are_compiled_without_placeholders_or_conflicts():
+    assert len(POSES) == 3
+    for scene in SCENES:
+        for pose in POSES:
+            prompt = compose_generation_prompt(scene, pose)
+            assert scene.scene_id in prompt
+            assert pose.pose_id in prompt
+            assert prompt.count("SELECTED SCENE —") == 1
+            assert prompt.count("SELECTED POSE —") == 1
+            assert prompt.count("FACIAL EXPRESSION —") == 1
+            assert "{{" not in prompt and "}}" not in prompt
+            assert "undefined" not in prompt.lower()
+            assert "null" not in prompt.lower()
+            assert "Keep both lips comfortably and naturally closed" not in prompt
+            assert "full required skin beauty and face-slimming" not in prompt
+
+
+def test_legacy_prompt_remains_available_as_exact_rollback_baseline():
+    prompt = compose_generation_prompt(
+        get_scene("PANDA_CASUAL_01"),
+        get_pose("FRONT"),
+        prompt_version=LEGACY_PROMPT_VERSION,
+    )
+    assert "NATURAL FACIAL EXPRESSION — OVERRIDES" in prompt
+    assert "Keep both lips comfortably and naturally closed" in prompt
+    assert "SELECTED VISITOR POSE" in prompt
+    assert NATURAL_EXPRESSION_PROMPT_VERSION not in prompt
 
 
 def test_identity_drift_gets_only_one_paid_retry(settings):

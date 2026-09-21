@@ -5,8 +5,10 @@ app/db.py
 app/face_engine.py
 app/main.py
 app/pipelines.py
+app/prompt_builder.py
 app/providers.py
 app/quality.py
+app/references.py
 app/scene_catalog.py
 app/schemas.py
 app/security.py

@@ -20,6 +20,13 @@ from .face_engine import FaceEngine, build_face_engine
 from .pipelines import run_direct_generation_pipeline
 from .providers import build_provider
 from .quality import QualityInspector
+from .references import (
+    active_model_id,
+    build_reference_manifest,
+    legacy_reference_manifest,
+    public_reference_labels,
+    reference_image_limit,
+)
 from .scene_catalog import (
     compose_generation_prompt,
     composed_prompt_hash,
@@ -37,6 +44,7 @@ from .security import (
     validate_delivery_signature,
 )
 from .storage import signed_delivery_url
+from .storage import normalize_reference_bytes
 
 
 def _numeric_id() -> str:
@@ -70,6 +78,15 @@ class ImageForgeService:
                 pose = get_pose(job["pose_id"])
                 participants = json.loads(job.get("participants_json") or "[]")
                 participant_count = len(participants) or 1
+                manifest = json.loads(job.get("reference_manifest_json") or "[]")
+                if not manifest:
+                    manifest = legacy_reference_manifest(participants)
+                prompt = job.get("prompt_text") or compose_generation_prompt(
+                    scene,
+                    pose,
+                    participant_count,
+                    prompt_version="legacy",
+                )
                 provider = build_provider(self.settings)
                 run_direct_generation_pipeline(
                     job_id,
@@ -77,7 +94,8 @@ class ImageForgeService:
                     self.settings,
                     self.face_engine,
                     provider,
-                    compose_generation_prompt(scene, pose, participant_count),
+                    prompt,
+                    reference_manifest=manifest,
                 )
             except Exception as exc:
                 self.db.update_generation(
@@ -106,6 +124,7 @@ class ImageForgeService:
 
 
 def _generation_response(service: ImageForgeService, job: dict[str, Any]) -> dict[str, Any]:
+    manifest = json.loads(job.get("reference_manifest_json") or "[]")
     response: dict[str, Any] = {
         "generation_id": job["id"],
         "order_no": job["order_no"],
@@ -114,7 +133,7 @@ def _generation_response(service: ImageForgeService, job: dict[str, Any]) -> dic
         "participant_count": len(json.loads(job.get("participants_json") or "[]")) or 1,
         "prompt_version": job["prompt_version"],
         "prompt_hash": job["prompt_hash"],
-        "reference_count": len(json.loads(job["source_paths_json"])),
+        "reference_count": len(manifest) or len(json.loads(job["source_paths_json"])),
         "status": job["status"],
         "progress": job["progress"],
         "eta_seconds": job["eta_seconds"],
@@ -142,7 +161,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         yield
         service.close()
 
-    app = FastAPI(title="ImageForge Direct", version="0.5.0", lifespan=lifespan)
+    app = FastAPI(title="ImageForge Direct", version="0.6.0", lifespan=lifespan)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=current.cors_allowed_origin_list,
@@ -185,6 +204,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "fallback_provider_model": (
                 current.fallback_image_model if current.fallback_provider_configured else None
             ),
+            "model_id": active_model_id(current),
+            "prompt_version": current.generation_prompt_version,
+            "reference_image_limit": reference_image_limit(current),
+            "release_version": current.release_version,
         }
 
     @app.post("/api/app/authentication")
@@ -213,8 +236,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         payload = await file.read()
         if not payload or len(payload) > 16 * 1024 * 1024:
             return {"code": 9001, "message": "图片为空或超过 16MB", "data": None}
+        try:
+            payload = normalize_reference_bytes(payload, current.reference_max_edge_px)
+        except (OSError, ValueError):
+            return {"code": 9001, "message": "图片内容无法读取", "data": None}
         file_id, face_id = _numeric_id(), _numeric_id()
-        upload_path = current.private_dir / "uploads" / f"{file_id}{extension}"
+        upload_path = current.private_dir / "uploads" / f"{file_id}.jpg"
         upload_path.parent.mkdir(parents=True, exist_ok=True)
         upload_path.write_bytes(payload)
         inspected = service.quality.inspect(upload_path)
@@ -327,6 +354,32 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             response["idempotent"] = True
             return response
 
+        try:
+            reference_manifest = build_reference_manifest(stored_participants, current)
+            reference_labels = public_reference_labels(reference_manifest)
+            prompt = compose_generation_prompt(
+                scene,
+                pose,
+                participant_count,
+                prompt_version=current.generation_prompt_version,
+                reference_roles=reference_labels,
+            )
+            prompt_version = composed_prompt_version(
+                scene,
+                pose,
+                participant_count,
+                prompt_version=current.generation_prompt_version,
+            )
+            prompt_hash = composed_prompt_hash(
+                scene,
+                pose,
+                participant_count,
+                prompt_version=current.generation_prompt_version,
+                reference_roles=reference_labels,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
         job_id = secrets.token_hex(12)
         created = service.db.create_generation(
             {
@@ -334,13 +387,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 "order_no": payload.order_no,
                 "scene_id": scene.scene_id,
                 "pose_id": pose.pose_id,
-                "prompt_version": composed_prompt_version(scene, pose, participant_count),
-                "prompt_hash": composed_prompt_hash(scene, pose, participant_count),
+                "prompt_version": prompt_version,
+                "prompt_hash": prompt_hash,
+                "prompt_text": prompt,
                 "source_paths": source_paths,
                 "participants": stored_participants,
+                "reference_manifest": reference_manifest,
                 "sku": payload.sku,
                 "eta_seconds": 90,
-                "provider": current.gpt_image_model,
+                "provider": active_model_id(current),
             }
         )
         if not created:
@@ -402,7 +457,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "participant_count": len(json.loads(job.get("participants_json") or "[]")) or 1,
             "prompt_version": job["prompt_version"],
             "prompt_hash": job["prompt_hash"],
-            "reference_count": len(json.loads(job["source_paths_json"])),
+            "reference_count": len(json.loads(job.get("reference_manifest_json") or "[]"))
+            or len(json.loads(job["source_paths_json"])),
             "status": job["status"],
             "attempts": json.loads(job["attempts_json"]),
             "qa": json.loads(job["qa_json"]),

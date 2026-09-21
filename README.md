@@ -81,6 +81,7 @@ npm start
 - `SIGNING_SECRET`
 - `KIOSK_DEVICE_PROXY_TOKEN`
 - `KIOSK_PAYMENT_MODE`（未接微信商户接口时设为 `mock`，正式上线时设为 `wechat_native`）
+- `GENERATION_PROMPT_VERSION`（真实视觉 A/B 通过前保持 `legacy`；新版为 `natural-expression-v1`）
 
 GitHub 的 `main` 分支更新后，Zeabur Git 服务会自动重新构建部署。
 
@@ -93,3 +94,5 @@ php -l server/app/api/logic/KioskLogic.php
 ```
 
 生成图片会产生第三方 API 费用。自动化验证不应触发真实生图或实际打印。
+
+自然表情提示词结构、参考图角色、灰度启用和回退方式见 [`PROMPT_UPGRADE.md`](PROMPT_UPGRADE.md)。
